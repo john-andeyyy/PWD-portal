@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { cn } from '@pwd/ui';
 
-const endpoint = '/api/auth/login';
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+const endpoint = `${apiBaseUrl}/auth/login`;
 
 interface LoginFormProps {
     onSuccess: (token: string) => void;

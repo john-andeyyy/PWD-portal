@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { cn } from '@pwd/ui';
 
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+
 interface Member {
     id: number;
     name: string;
@@ -21,7 +23,7 @@ export function MembersManager({ token }: MembersManagerProps) {
     const [form, setForm] = useState({ name: '', email: '', phone: '', role: '' });
 
     const fetchMembers = async () => {
-        const response = await fetch('/api/members', {
+        const response = await fetch(`${apiBaseUrl}/members`, {
             headers: { Authorization: `Bearer ${token}` }
         });
         if (response.ok) {
@@ -38,7 +40,7 @@ export function MembersManager({ token }: MembersManagerProps) {
     const createMember = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setStatus('Creating member...');
-        const response = await fetch('/api/members', {
+        const response = await fetch(`${apiBaseUrl}/members`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
