@@ -1,22 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { LoginForm } from '../components/LoginForm';
-import { MembersManager } from '../components/MembersManager';
+import { LoginForm } from '@/components/LoginForm';
 
-export default function Home() {
-    const [token, setToken] = useState<string | null>(null);
-
+export default function LoginPage() {
     return (
-        <main className="min-h-screen bg-slate-950 text-slate-100 p-6">
-            <div className="mx-auto max-w-5xl rounded-3xl border border-slate-700 bg-slate-900/80 p-10 shadow-2xl shadow-slate-950/50">
-                <h1 className="text-4xl font-semibold text-white">PWD President Portal</h1>
-                <p className="mt-3 text-slate-300">Login to manage members and access the PWD president dashboard.</p>
-                {!token ? (
-                    <LoginForm onSuccess={setToken} />
-                ) : (
-                    <MembersManager token={token} />
-                )}
+        <main className="flex min-h-screen flex-col items-center justify-center p-6">
+            <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-10 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                <div className="mb-8 text-center">
+                    <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Login</h2>
+                    <p className="mt-2 text-slate-600 dark:text-slate-400">Sign in to manage PWD members</p>
+                </div>
+                <LoginForm />
             </div>
         </main>
     );
