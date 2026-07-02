@@ -10,31 +10,37 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { PermissionsGuard } from "../auth/permissions.guard";
+import { Permissions } from "../auth/permissions.decorator";
 import { MembersService } from "./members.service";
 import { CreateMemberDto } from "./dto/create-member.dto";
 import { UpdateMemberDto } from "./dto/update-member.dto";
 
 @Controller("members")
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class MembersController {
   constructor(private readonly membersService: MembersService) {}
 
   @Post()
+  @Permissions("canCreateMembers")
   create(@Request() req: any, @Body() createMemberDto: CreateMemberDto) {
     return this.membersService.create(req.user.userId, createMemberDto);
   }
 
   @Get()
+  @Permissions("canViewMembers")
   findAll(@Request() req: any) {
     return this.membersService.findAll(req.user.userId);
   }
 
   @Get(":id")
+  @Permissions("canViewMembers")
   findOne(@Request() req: any, @Param("id") id: string) {
     return this.membersService.findOne(req.user.userId, Number(id));
   }
 
   @Put(":id")
+  @Permissions("canUpdateMembers")
   update(
     @Request() req: any,
     @Param("id") id: string,
@@ -48,6 +54,7 @@ export class MembersController {
   }
 
   @Delete(":id")
+  @Permissions("canDeleteMembers")
   remove(@Request() req: any, @Param("id") id: string) {
     return this.membersService.remove(req.user.userId, Number(id));
   }

@@ -15,7 +15,6 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
             const token = localStorage.getItem('auth_token');
             setIsAuthenticated(!!token);
         };
-
         checkAuth();
         window.addEventListener('storage', checkAuth);
         return () => window.removeEventListener('storage', checkAuth);
