@@ -7,7 +7,7 @@
     "start:dev": "pnpm exec nest start --watch",
     "build": "pnpm exec prisma generate --schema=../../prisma/schema.prisma && pnpm exec nest build",
     "lint": "pnpm exec eslint \"src/**/*.{ts,js}\" --fix",
-    "seed": "pnpm exec ts-node ../../prisma/seed.ts"
+    "seed": "tsx ../../prisma/seed.ts"
   },
   "prisma": {
     "schema": "../../prisma/schema.prisma"
@@ -34,11 +34,12 @@
     "@types/express": "^4.17.20",
     "@types/node": "^20.11.0",
     "@types/passport-jwt": "^3.0.8",
-    "eslint": "^8.57.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.57.0",
     "prisma": "^5.22.0",
     "ts-node": "^10.9.2",
+    "tsx": "^4.22.5",
     "typescript": "^5.6.0"
   }
 }

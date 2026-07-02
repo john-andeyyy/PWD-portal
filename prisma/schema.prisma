@@ -7,11 +7,26 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Role {
+  id               Int       @id @default(autoincrement())
+  name             String    @unique
+  canCreateMembers Boolean   @default(false)
+  canViewMembers   Boolean   @default(true)
+  canUpdateMembers Boolean   @default(false)
+  canDeleteMembers Boolean   @default(false)
+  canManageRoles   Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  presidents       President[]
+}
+
 model President {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   name      String
   password  String
+  isEnabled Boolean  @default(true)
+  roleId    Int?
+  role      Role?    @relation(fields: [roleId], references: [id])
   createdAt DateTime @default(now())
   members   Member[]
 }

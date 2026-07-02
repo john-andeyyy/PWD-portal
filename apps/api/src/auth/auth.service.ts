@@ -13,9 +13,10 @@ export class AuthService {
   async validatePresident(email: string, password: string) {
     const president = await this.prisma.president.findUnique({
       where: { email },
+      include: { role: true },
     });
-    if (!president) {
-      throw new UnauthorizedException("Invalid credentials.");
+    if (!president || !president.isEnabled) {
+      throw new UnauthorizedException("Account disabled ");
     }
 
     const isValid = await bcrypt.compare(password, president.password);

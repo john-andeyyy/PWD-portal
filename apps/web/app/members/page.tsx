@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { MembersManager } from '@/components/MembersManager';
+import { AccountsManager } from '@/components/AccountsManager';
 import { Sidebar } from '@/components/Sidebar';
 
 type Panel = 'dashboard' | 'list' | 'accounts';
@@ -10,7 +11,7 @@ type Panel = 'dashboard' | 'list' | 'accounts';
 export default function MembersPage() {
     const router = useRouter();
     const [token, setToken] = useState<string | null>(null);
-    const [panel, setPanel] = useState<Panel>('dashboard');
+    const [panel, setPanel] = useState<Panel>('accounts');
 
     const handleLogout = () => {
         localStorage.removeItem('auth_token');
@@ -81,24 +82,7 @@ export default function MembersPage() {
                                 </div>
                             </div>
                         ) : panel === 'accounts' ? (
-                            <div className="space-y-6">
-                                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 dark:border-slate-700 dark:bg-slate-950">
-                                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Accounts overview</h2>
-                                    <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
-                                        Here you can review account settings and access control for the PWD portal.
-                                    </p>
-                                </div>
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <div className="rounded-3xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-950">
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">User logins</p>
-                                        <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">Admin only</p>
-                                    </div>
-                                    <div className="rounded-3xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-950">
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">Permissions</p>
-                                        <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">Standard</p>
-                                    </div>
-                                </div>
-                            </div>
+                            <AccountsManager token={token} />
                         ) : (
                             <MembersManager token={token} />
                         )}
