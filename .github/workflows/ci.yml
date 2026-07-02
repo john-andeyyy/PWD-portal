@@ -9,13 +9,19 @@ on:
 jobs:
   checks:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - uses: actions/setup-node@v5
         with:
           node-version: 20
-          cache: "pnpm"
-      - run: corepack enable
+          cache: pnpm
+
       - run: pnpm install
       - run: pnpm lint
       - run: pnpm build
