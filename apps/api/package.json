@@ -9,6 +9,9 @@
     "lint": "pnpm exec eslint \"src/**/*.{ts,js}\" --fix",
     "seed": "pnpm exec ts-node ../../prisma/seed.ts"
   },
+  "prisma": {
+    "schema": "../../prisma/schema.prisma"
+  },
   "dependencies": {
     "@nestjs/common": "^10.3.4",
     "@nestjs/core": "^10.3.4",

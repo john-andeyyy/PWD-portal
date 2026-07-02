@@ -17,12 +17,12 @@ model President {
 }
 
 model Member {
-  id          Int      @id @default(autoincrement())
-  president   President @relation(fields: [presidentId], references: [id])
+  id          Int       @id @default(autoincrement())
   presidentId Int
   name        String
-  email       String   @unique
+  email       String    @unique
   phone       String?
   role        String?
-  joinedAt    DateTime @default(now())
+  joinedAt    DateTime  @default(now())
+  president   President @relation(fields: [presidentId], references: [id])
 }
