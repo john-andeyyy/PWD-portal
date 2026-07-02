@@ -60,26 +60,13 @@ export function MembersManager({ token }: MembersManagerProps) {
         setStatus('Failed to create member.');
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem('auth_token');
-        router.push('/');
-    };
-
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Member Management</h2>
-                <div className="flex items-center gap-4">
-                    <span className="rounded-full bg-slate-200 px-3 py-1 text-sm font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                        {members.length} members
-                    </span>
-                    <button
-                        onClick={handleLogout}
-                        className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700"
-                    >
-                        Logout
-                    </button>
-                </div>
+                <span className="rounded-full bg-slate-200 px-3 py-1 text-sm font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    {members.length} members
+                </span>
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 dark:border-slate-700 dark:bg-slate-800">

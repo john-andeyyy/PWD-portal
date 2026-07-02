@@ -3,12 +3,20 @@
 import { useTheme } from '@/app/theme-provider';
 import { useRouter } from 'next/navigation';
 
-export function Navbar() {
+interface NavbarProps {
+    isAuthenticated?: boolean;
+}
+
+export function Navbar({ isAuthenticated = false }: NavbarProps) {
     const { theme, toggleTheme } = useTheme();
     const router = useRouter();
 
+    if (isAuthenticated) {
+        return null;
+    }
+
     return (
-        <nav className="border-b border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+        <nav className="sticky top-0 z-50 border-b border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
             <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
                 <div className="flex items-center gap-3">
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white">

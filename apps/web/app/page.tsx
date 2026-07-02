@@ -48,18 +48,11 @@ export default function HomePage() {
                     </div>
 
                     <div className="flex flex-col items-center justify-center gap-4 pt-4 sm:flex-row sm:justify-center">
-                        <Link
-                            href="/members"
-                            className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-sky-600 to-indigo-600 px-8 py-4 text-base font-semibold text-white shadow-lg transition hover:from-sky-700 hover:to-indigo-700"
-                        >
-                            Get Started
+                        <Link href={'/login' as const} className="inline-flex items-center justify-center rounded-full bg-slate-900 px-8 py-4 text-base font-semibold text-white transition hover:bg-slate-800">
+                            Login to continue
                         </Link>
-
-                        <Link
-                            href="/login"
-                            className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-8 py-4 text-base font-semibold text-slate-900 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:border-slate-500"
-                        >
-                            Sign in
+                        <Link href={'/login' as const} className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-8 py-4 text-base font-semibold text-slate-900 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:border-slate-500">
+                            Proceed to login
                         </Link>
                     </div>
                 </div>
