@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { cn } from '@pwd/ui';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
@@ -14,6 +15,7 @@ interface Member {
     disability: string;
     phoneNumber: string;
     address: string;
+    barangay?: string;
     isBedridden: boolean;
     pwdId: string;
     dateIssued: string;
@@ -35,13 +37,60 @@ export function MembersManager({ token }: MembersManagerProps) {
         disability: '',
         phoneNumber: '',
         address: '',
+        barangay: '',
         isBedridden: false,
         pwdId: '',
         dateIssued: '',
         gender: ''
     });
+    const [otherDisability, setOtherDisability] = useState('');
+
+    const DISABILITIES = [
+        'CANCER (RA 11215)',
+        'DEAF',
+        'DEAF & MUTE',
+        'Down Syndrome',
+        'HEARING',
+        'HEART',
+        'Hyper',
+        'INTELLECTUAL',
+        'LEARNING',
+        'MENTAL',
+        'MULTIPLE',
+        'MULTIPLE DISABILITY',
+        'ORTHOPEDIC',
+        'PHYSICAL',
+        'POLIO',
+        'PSYCHOLOGICAL',
+        'PSYCHOSOCIAL',
+        'RARE DISEASE (RA 10747)',
+        'SPEECH',
+        'SPEECH IMPAIRMENT',
+        'Other'
+    ];
+
+    const BARANGAYS = [
+        'BONGA MAYOR',
+        'BONGA MENOR',
+        'BUISAN',
+        'CAMACHILIHAN',
+        'CAMBAOG',
+        'CATACTE',
+        'LICIADA',
+        'MALAMIG',
+        'MALAWAK',
+        'POBLACION',
+        'SAN PEDRO',
+        'TALAMPAS',
+        'TANAWAN',
+        'TIBAGAN'
+    ];
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [step, setStep] = useState(1);
+    const router = useRouter();
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const pageSize = 10;
 
     const isStep1Valid = () => {
         return (
@@ -50,6 +99,7 @@ export function MembersManager({ token }: MembersManagerProps) {
             form.bday !== '' &&
             form.gender !== '' &&
             form.address.trim() !== '' &&
+            form.barangay.trim() !== '' &&
             form.phoneNumber.trim() !== ''
         );
     };
@@ -64,6 +114,7 @@ export function MembersManager({ token }: MembersManagerProps) {
         });
         if (response.ok) {
             setMembers(await response.json());
+            setCurrentPage(1);
         }
     };
 
@@ -93,6 +144,7 @@ export function MembersManager({ token }: MembersManagerProps) {
                 mname: '',
                 bday: '',
                 disability: '',
+                barangay: '',
                 phoneNumber: '',
                 address: '',
                 isBedridden: false,
@@ -100,6 +152,7 @@ export function MembersManager({ token }: MembersManagerProps) {
                 dateIssued: '',
                 gender: ''
             });
+            setOtherDisability('');
             setIsModalOpen(false);
             setStep(1);
             fetchMembers();
@@ -130,6 +183,7 @@ export function MembersManager({ token }: MembersManagerProps) {
                                 mname: '',
                                 bday: '',
                                 disability: '',
+                                barangay: '',
                                 phoneNumber: '',
                                 address: '',
                                 isBedridden: false,
@@ -172,6 +226,9 @@ export function MembersManager({ token }: MembersManagerProps) {
                                     Disability
                                 </th>
                                 <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                                    Barangay
+                                </th>
+                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
                                     Phone
                                 </th>
                             </tr>
@@ -184,20 +241,51 @@ export function MembersManager({ token }: MembersManagerProps) {
                                     </td>
                                 </tr>
                             ) : (
-                                members.map((member) => (
-                                    <tr key={member.id} className="transition hover:bg-slate-50 dark:hover:bg-slate-800/60">
-                                        <td className="px-5 py-4 text-sm font-medium text-slate-900 dark:text-white">
-                                            {[member.fname, member.mname, member.lname].filter(Boolean).join(' ')}
-                                        </td>
-                                        <td className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300">{member.pwdId}</td>
-                                        <td className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300">{member.disability}</td>
-                                        <td className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300">{member.phoneNumber}</td>
-                                    </tr>
-                                ))
+                                // client-side pagination
+                                members
+                                    .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                                    .map((member) => (
+                                        <tr
+                                            key={member.id}
+                                            className="cursor-pointer transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                                            onClick={() => router.push(`/members/${member.id}`)}
+                                        >
+                                            <td className="px-5 py-4 text-sm font-medium text-slate-900 dark:text-white">
+                                                {[member.fname, member.mname, member.lname].filter(Boolean).join(' ')}
+                                            </td>
+                                            <td className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300">{member.pwdId}</td>
+                                            <td className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300">{member.disability}</td>
+                                            <td className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300">{member.barangay ?? '-'}</td>
+                                            <td className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300">{member.phoneNumber}</td>
+                                        </tr>
+                                    ))
                             )}
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination controls */}
+                {members.length > pageSize ? (
+                    <div className="flex items-center justify-end gap-3 px-4 py-3">
+                        <button
+                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                            className="rounded-md border px-3 py-1 text-sm"
+                            disabled={currentPage === 1}
+                        >
+                            Prev
+                        </button>
+
+                        <span className="text-sm text-slate-600 dark:text-slate-400">Page {currentPage} of {Math.ceil(members.length / pageSize)}</span>
+
+                        <button
+                            onClick={() => setCurrentPage((p) => Math.min(Math.ceil(members.length / pageSize), p + 1))}
+                            className="rounded-md border px-3 py-1 text-sm"
+                            disabled={currentPage === Math.ceil(members.length / pageSize)}
+                        >
+                            Next
+                        </button>
+                    </div>
+                ) : null}
             </div>
 
             {isModalOpen ? (
@@ -330,6 +418,25 @@ export function MembersManager({ token }: MembersManagerProps) {
                                         </label>
 
                                         <label className="space-y-2">
+                                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Barangay <span className="text-red-500">*</span></span>
+                                            <select
+                                                value={form.barangay}
+                                                onChange={(e) => setForm({ ...form, barangay: e.target.value })}
+                                                className={cn(
+                                                    'w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-slate-900 outline-none transition',
+                                                    'focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20',
+                                                    'dark:border-slate-600 dark:bg-slate-800 dark:text-white'
+                                                )}
+                                                required
+                                            >
+                                                <option value="">Select barangay</option>
+                                                {BARANGAYS.map((b) => (
+                                                    <option key={b} value={b}>{b}</option>
+                                                ))}
+                                            </select>
+                                        </label>
+
+                                        <label className="space-y-2">
                                             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Phone Number <span className="text-red-500">*</span></span>
                                             <input
                                                 value={form.phoneNumber}
@@ -348,17 +455,45 @@ export function MembersManager({ token }: MembersManagerProps) {
                                     <>
                                         <label className="space-y-2 sm:col-span-2">
                                             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Disability <span className="text-red-500">*</span></span>
-                                            <input
-                                                value={form.disability}
-                                                onChange={(event) => setForm({ ...form, disability: event.target.value })}
-                                                placeholder="Disability type"
+                                            <select
+                                                value={DISABILITIES.includes(form.disability) ? form.disability : (otherDisability ? 'Other' : '')}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val === 'Other') {
+                                                        setForm({ ...form, disability: '' });
+                                                    } else {
+                                                        setForm({ ...form, disability: val });
+                                                        setOtherDisability('');
+                                                    }
+                                                }}
                                                 className={cn(
-                                                    'w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-slate-900 placeholder-slate-500 outline-none transition',
+                                                    'w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-slate-900 outline-none transition',
                                                     'focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20',
-                                                    'dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder-slate-400'
+                                                    'dark:border-slate-600 dark:bg-slate-800 dark:text-white'
                                                 )}
                                                 required
-                                            />
+                                            >
+                                                <option value="">Select disability</option>
+                                                {DISABILITIES.map((d) => (
+                                                    <option key={d} value={d}>{d}</option>
+                                                ))}
+                                            </select>
+
+                                            {(!DISABILITIES.includes(form.disability)) || (otherDisability) ? (
+                                                <input
+                                                    value={otherDisability || form.disability}
+                                                    onChange={(e) => {
+                                                        setOtherDisability(e.target.value);
+                                                        setForm({ ...form, disability: e.target.value });
+                                                    }}
+                                                    placeholder="Specify disability"
+                                                    className={cn(
+                                                        'w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-slate-900 placeholder-slate-500 outline-none transition mt-2',
+                                                        'focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20',
+                                                        'dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder-slate-400'
+                                                    )}
+                                                />
+                                            ) : null}
                                         </label>
 
                                         <label className="space-y-2">

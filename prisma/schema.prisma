@@ -41,6 +41,7 @@ model Member {
   disability  String
   phoneNumber String
   address     String
+  barangay    String
   isBedridden Boolean
   pwdId       String    @unique
   dateIssued  DateTime

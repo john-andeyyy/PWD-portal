@@ -35,6 +35,10 @@ export class CreateMemberDto {
   @MaxLength(255)
   address: string;
 
+  @IsString()
+  @MaxLength(80)
+  barangay: string;
+
   @IsBoolean()
   isBedridden: boolean;
 

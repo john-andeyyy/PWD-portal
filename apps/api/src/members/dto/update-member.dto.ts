@@ -42,6 +42,11 @@ export class UpdateMemberDto {
   address?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  barangay?: string;
+
+  @IsOptional()
   @IsBoolean()
   isBedridden?: boolean;
 
