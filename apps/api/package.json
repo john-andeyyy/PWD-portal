@@ -5,12 +5,12 @@
   "scripts": {
     "start": "pnpm exec node dist/main",
     "start:dev": "pnpm exec nest start --watch",
-    "build": "pnpm exec prisma generate --schema=../../prisma/schema.prisma && pnpm exec nest build",
+    "build": "pnpm exec prisma generate && pnpm exec nest build",
     "lint": "pnpm exec eslint \"src/**/*.{ts,js}\" --fix",
     "seed": "tsx ../../prisma/seed.ts"
   },
   "prisma": {
-    "schema": "../../prisma/schema.prisma"
+    "schema": "./prisma/schema.prisma"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.4",
