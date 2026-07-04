@@ -372,20 +372,7 @@ export function AccountsManager({ token }: { token: string }) {
                         </button>
                     </div>
 
-                    <div className="rounded-3xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-950">
-                        <h2 className="mb-4 text-xl font-semibold text-slate-900 dark:text-white">Role quick notes</h2>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">President accounts can be assigned a role that governs member permissions. Use the role selector when creating or updating president accounts.</p>
-                        <div className="mt-6 space-y-3 rounded-3xl bg-slate-50 p-4 dark:bg-slate-900">
-                            <p className="text-sm font-semibold text-slate-900 dark:text-white">Permissions supported</p>
-                            <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
-                                <li>• Create member records</li>
-                                <li>• View member list and details</li>
-                                <li>• Update member records</li>
-                                <li>• Delete member records</li>
-                                <li>• Grant and edit roles</li>
-                            </ul>
-                        </div>
-                    </div>
+
 
                     <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 shadow-sm dark:border-slate-700 dark:bg-slate-950">
                         <div className="flex flex-col gap-3 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
