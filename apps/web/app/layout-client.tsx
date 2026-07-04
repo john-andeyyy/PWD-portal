@@ -8,7 +8,7 @@ import { usePathname } from 'next/navigation';
 export function LayoutClient({ children }: { children: React.ReactNode }) {
     const [isAuthenticated, setIsAuthenticated] = useState<boolean | undefined>(undefined);
     const pathname = usePathname();
-    const isProtectedRoute = pathname?.startsWith('/members');
+    const isProtectedRoute = pathname?.startsWith('/dashboard') || pathname?.startsWith('/accounts') || pathname?.startsWith('/members');
 
     useEffect(() => {
         const checkAuth = () => {

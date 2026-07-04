@@ -265,8 +265,8 @@ export function AccountsManager({ token }: { token: string }) {
                     </button>
                     <button
                         type="button"
-                        onClick={() => window.open('/roles', '_blank')}
-                        className={tabClasses(false)}
+                        onClick={() => setActiveTab('role')}
+                        className={tabClasses(activeTab === 'role')}
                     >
                         Role
                     </button>
@@ -468,7 +468,144 @@ export function AccountsManager({ token }: { token: string }) {
                         </div>
                     </div>
                 </div>
-            ) : null}
+            ) : (
+                <div className="space-y-6">
+                    <div className="rounded-3xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-950">
+                        <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Create a new role</h2>
+                        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Add a role and choose the permissions it should grant.</p>
+                        <form onSubmit={handleCreateRole} className="mt-6 space-y-4">
+                            <input
+                                value={roleForm.name}
+                                onChange={(event) => setRoleForm({ ...roleForm, name: event.target.value })}
+                                placeholder="Role name"
+                                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                                required
+                            />
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <label className="inline-flex items-center gap-3 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                                    <input
+                                        type="checkbox"
+                                        checked={roleForm.canCreateMembers}
+                                        onChange={(event) => setRoleForm({ ...roleForm, canCreateMembers: event.target.checked })}
+                                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                    />
+                                    Create members
+                                </label>
+                                <label className="inline-flex items-center gap-3 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                                    <input
+                                        type="checkbox"
+                                        checked={roleForm.canViewMembers}
+                                        onChange={(event) => setRoleForm({ ...roleForm, canViewMembers: event.target.checked })}
+                                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                    />
+                                    View members
+                                </label>
+                                <label className="inline-flex items-center gap-3 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                                    <input
+                                        type="checkbox"
+                                        checked={roleForm.canUpdateMembers}
+                                        onChange={(event) => setRoleForm({ ...roleForm, canUpdateMembers: event.target.checked })}
+                                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                    />
+                                    Update members
+                                </label>
+                                <label className="inline-flex items-center gap-3 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                                    <input
+                                        type="checkbox"
+                                        checked={roleForm.canDeleteMembers}
+                                        onChange={(event) => setRoleForm({ ...roleForm, canDeleteMembers: event.target.checked })}
+                                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                    />
+                                    Delete members
+                                </label>
+                                <label className="inline-flex items-center gap-3 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                                    <input
+                                        type="checkbox"
+                                        checked={roleForm.canManageRoles}
+                                        onChange={(event) => setRoleForm({ ...roleForm, canManageRoles: event.target.checked })}
+                                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                    />
+                                    Manage roles
+                                </label>
+                            </div>
+                            <button
+                                type="submit"
+                                className="inline-flex items-center justify-center rounded-2xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700"
+                            >
+                                Create role
+                            </button>
+                        </form>
+                    </div>
+
+                    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 shadow-sm dark:border-slate-700 dark:bg-slate-950">
+                        <div className="flex flex-col gap-3 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Roles</h2>
+                                <p className="text-sm text-slate-600 dark:text-slate-400">Toggle permissions directly in the table.</p>
+                            </div>
+                            <span className="rounded-full bg-slate-200 px-3 py-1 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-300">{roleCount} total</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
+                                <thead className="bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                                    <tr>
+                                        <th className="px-6 py-3">Role</th>
+                                        <th className="px-6 py-3">Create</th>
+                                        <th className="px-6 py-3">View</th>
+                                        <th className="px-6 py-3">Update</th>
+                                        <th className="px-6 py-3">Delete</th>
+                                        <th className="px-6 py-3">Manage roles</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {roles.map((role) => (
+                                        <tr key={role.id} className="border-t border-slate-200 dark:border-slate-700">
+                                            <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">{role.name}</td>
+                                            {(['canCreateMembers', 'canViewMembers', 'canUpdateMembers', 'canDeleteMembers', 'canManageRoles'] as Array<keyof Permissions>).map((permission) => (
+                                                <td key={permission} className="px-6 py-4">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleToggleRolePermission(role, permission)}
+                                                        className={cn(
+                                                            'rounded-full px-3 py-1 text-xs font-semibold transition',
+                                                            role[permission]
+                                                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200'
+                                                                : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200',
+                                                        )}
+                                                    >
+                                                        {role[permission] ? 'On' : 'Off'}
+                                                    </button>
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 bg-slate-100 text-sm text-slate-600 dark:bg-slate-900 dark:text-slate-400">
+                            <p>Page {rolePage} of {rolePageCount}</p>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    disabled={rolePage <= 1}
+                                    onClick={() => setRolePage((page) => Math.max(1, page - 1))}
+                                    className="rounded-full border border-slate-300 bg-white px-3 py-1 text-slate-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+                                >
+                                    Previous
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={rolePage >= rolePageCount}
+                                    onClick={() => setRolePage((page) => Math.min(rolePageCount, page + 1))}
+                                    className="rounded-full border border-slate-300 bg-white px-3 py-1 text-slate-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
