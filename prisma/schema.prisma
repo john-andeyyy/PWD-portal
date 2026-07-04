@@ -34,10 +34,17 @@ model President {
 model Member {
   id          Int       @id @default(autoincrement())
   presidentId Int
-  name        String
-  email       String    @unique
-  phone       String?
-  role        String?
+  fname       String
+  lname       String
+  mname       String?
+  bday        DateTime
+  disability  String
+  phoneNumber String
+  address     String
+  isBedridden Boolean
+  pwdId       String    @unique
+  dateIssued  DateTime
+  gender      String
   joinedAt    DateTime  @default(now())
   president   President @relation(fields: [presidentId], references: [id])
 }

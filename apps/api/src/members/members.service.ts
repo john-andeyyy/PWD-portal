@@ -8,9 +8,15 @@ export class MembersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(presidentId: number, data: CreateMemberDto) {
+    const payload = {
+      ...data,
+      bday: new Date(data.bday),
+      dateIssued: new Date(data.dateIssued),
+    };
+
     return this.prisma.member.create({
       data: {
-        ...data,
+        ...payload,
         president: { connect: { id: presidentId } },
       },
     });
@@ -32,7 +38,17 @@ export class MembersService {
 
   async update(presidentId: number, id: number, data: UpdateMemberDto) {
     await this.findOne(presidentId, id);
-    return this.prisma.member.update({ where: { id }, data });
+    const payload: Record<string, unknown> = { ...data };
+
+    if (data.bday) {
+      payload.bday = new Date(data.bday);
+    }
+
+    if (data.dateIssued) {
+      payload.dateIssued = new Date(data.dateIssued);
+    }
+
+    return this.prisma.member.update({ where: { id }, data: payload });
   }
 
   async remove(presidentId: number, id: number) {
