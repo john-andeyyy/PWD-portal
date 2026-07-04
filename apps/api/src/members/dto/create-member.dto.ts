@@ -1,18 +1,55 @@
-import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsDateString,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from "class-validator";
 
 export class CreateMemberDto {
   @IsString()
-  @MaxLength(120)
-  name: string;
+  @MaxLength(80)
+  fname: string;
 
-  @IsEmail()
-  email: string;
+  @IsString()
+  @MaxLength(80)
+  lname: string;
 
   @IsOptional()
   @IsString()
-  phone?: string;
+  @MaxLength(80)
+  mname?: string;
 
-  @IsOptional()
+  @IsDateString()
+  bday: string;
+
   @IsString()
-  role?: string;
+  @MaxLength(160)
+  disability: string;
+
+  @IsString()
+  @MaxLength(40)
+  phoneNumber: string;
+
+  @IsString()
+  @MaxLength(255)
+  address: string;
+
+  @IsString()
+  @MaxLength(80)
+  barangay: string;
+
+  @IsBoolean()
+  isBedridden: boolean;
+
+  @IsString()
+  @MaxLength(60)
+  pwdId: string;
+
+  @IsDateString()
+  dateIssued: string;
+
+  @IsString()
+  @MaxLength(30)
+  gender: string;
 }

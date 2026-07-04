@@ -1,25 +1,30 @@
 'use client';
 
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+
 interface SidebarItem {
-    key: 'dashboard' | 'list' | 'accounts';
+    key: 'dashboard' | 'members' | 'accounts';
     label: string;
+    href: '/dashboard' | '/members' | '/accounts';
 }
 
 const sidebarItems: SidebarItem[] = [
-    { key: 'dashboard', label: 'Dashboard' },
-    { key: 'list', label: 'List' },
-    { key: 'accounts', label: 'Accounts' }
+    { key: 'dashboard', label: 'Dashboard', href: '/dashboard' },
+    { key: 'members', label: 'Members', href: '/members' },
+    { key: 'accounts', label: 'Accounts', href: '/accounts' }
 ];
 
 interface SidebarProps {
-    selected: SidebarItem['key'];
-    onSelect: (key: SidebarItem['key']) => void;
     onLogout: () => void;
 }
 
-export function Sidebar({ selected, onSelect, onLogout }: SidebarProps) {
+export function Sidebar({ onLogout }: SidebarProps) {
+    const pathname = usePathname();
+    const sidebarClasses = 'hidden w-80 shrink-0 border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/40 dark:border-slate-700 dark:bg-slate-950 dark:shadow-none lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:flex-col';
+
     return (
-        <aside className="hidden w-80 shrink-0 border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/40 dark:border-slate-700 dark:bg-slate-950 dark:shadow-none lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 lg:block">
+        <aside className={sidebarClasses}>
             <div className="mb-8">
                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Navigation</p>
                 <h2 className="mt-3 text-2xl font-bold text-slate-900 dark:text-white">Workspace</h2>
@@ -27,22 +32,19 @@ export function Sidebar({ selected, onSelect, onLogout }: SidebarProps) {
 
             <nav className="space-y-2 flex-1">
                 {sidebarItems.map((item) => {
-                    const isActive = selected === item.key;
+                    const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
                     return (
-                        <button
+                        <Link
                             key={item.key}
-                            type="button"
-                            onClick={() => onSelect(item.key)}
+                            href={item.href}
+                            aria-current={isActive ? 'page' : undefined}
                             className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-medium transition ${isActive
                                 ? 'bg-sky-600 text-white shadow-sm shadow-sky-500/20 dark:bg-sky-500'
                                 : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
                                 }`}
                         >
                             <span>{item.label}</span>
-                            <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                                {item.key}
-                            </span>
-                        </button>
+                        </Link>
                     );
                 })}
             </nav>

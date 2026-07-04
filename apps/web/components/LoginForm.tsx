@@ -36,7 +36,7 @@ export function LoginForm() {
         if (data.accessToken) {
             localStorage.setItem('auth_token', data.accessToken);
             setStatus('Login successful. Redirecting...');
-            router.push('/members');
+            router.push('/dashboard');
             return;
         }
 
