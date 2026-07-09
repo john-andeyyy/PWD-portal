@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { appVersion } from '@/lib/release';
 
 interface SidebarItem {
     key: 'dashboard' | 'members' | 'accounts';
@@ -49,7 +50,13 @@ export function Sidebar({ onLogout }: SidebarProps) {
                 })}
             </nav>
 
-            <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
+            <div className="mt-8 border-t border-slate-200 pt-8 dark:border-slate-700">
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
+                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Version</p>
+                    <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white dark:bg-white dark:text-slate-900">
+                        {appVersion}
+                    </span>
+                </div>
                 <button
                     type="button"
                     onClick={onLogout}
