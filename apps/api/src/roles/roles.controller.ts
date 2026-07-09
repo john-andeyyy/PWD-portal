@@ -61,9 +61,8 @@ export class RolesController {
   @Permissions("accounts.manage")
   async update(@Param("id") id: string, @Body() updateRoleDto: UpdateRoleDto) {
     try {
-      const roleId = Number(id);
-      const result = await this.rolesService.update(roleId, updateRoleDto);
-      this.logger.log(`Successfully updated role ${roleId}`);
+      const result = await this.rolesService.update(id, updateRoleDto);
+      this.logger.log(`Successfully updated role ${id}`);
       return result;
     } catch (error) {
       this.logger.error(

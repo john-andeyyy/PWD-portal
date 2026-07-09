@@ -10,7 +10,12 @@ const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:300
 export function LayoutClient({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
-    const isProtectedRoute = pathname?.startsWith('/dashboard') || pathname?.startsWith('/accounts') || pathname?.startsWith('/members');
+    const isProtectedRoute =
+        pathname?.startsWith('/dashboard') ||
+        pathname?.startsWith('/accounts') ||
+        pathname?.startsWith('/members') ||
+        pathname?.startsWith('/roles') ||
+        pathname?.startsWith('/profile');
 
     const [isAuthenticated, setIsAuthenticated] = useState<boolean | undefined>(undefined);
     const [hasPortalAccess, setHasPortalAccess] = useState<boolean | undefined>(undefined);

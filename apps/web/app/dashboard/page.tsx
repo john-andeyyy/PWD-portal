@@ -1,94 +1,124 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { MembersManager } from '@/components/MembersManager';
-import { AccountsManager } from '@/components/AccountsManager';
-import { Sidebar } from '@/components/Sidebar';
+import { Accessibility, BriefcaseBusiness, Shield, Users } from 'lucide-react';
+import { AppShell } from '@/components/AppShell';
+import { Badge, Card, Skeleton } from '@/components/ui/primitives';
+import { apiBaseUrl } from '@/lib/api';
 
-type Panel = 'dashboard' | 'list' | 'accounts';
+interface DashboardStats {
+    total: number;
+    byDisability: Array<{ disability: string; count: number }>;
+}
 
-export default function DashboardPage() {
-    const router = useRouter();
-    const [token, setToken] = useState<string | null>(null);
-    const [panel] = useState<Panel>('dashboard');
+interface PagerResponse<T> {
+    data: T[];
+    total: number;
+}
 
-    const handleLogout = () => {
-        localStorage.removeItem('auth_token');
-        router.push('/');
-    };
+function DashboardContent({ token }: { token: string }) {
+    const [memberStats, setMemberStats] = useState<DashboardStats | null>(null);
+    const [accountsTotal, setAccountsTotal] = useState<number | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const storedToken = localStorage.getItem('auth_token');
-        if (!storedToken) {
-            router.push('/');
-        } else {
-            setToken(storedToken);
-        }
-    }, [router]);
+        let cancelled = false;
 
-    if (!token) {
-        return null;
-    }
+        const fetchDashboard = async () => {
+            setIsLoading(true);
+            const headers = { Authorization: `Bearer ${token}` };
+            const [memberResponse, presidentResponse] = await Promise.all([
+                fetch(`${apiBaseUrl}/members/stats`, { headers }),
+                fetch(`${apiBaseUrl}/presidents?page=1&limit=1`, { headers }),
+                fetch(`${apiBaseUrl}/roles?page=1&limit=1`, { headers }),
+            ]);
+
+            if (cancelled) return;
+
+            if (memberResponse.ok) {
+                setMemberStats(await memberResponse.json());
+            }
+
+            if (presidentResponse.ok) {
+                const data = (await presidentResponse.json()) as PagerResponse<unknown>;
+                setAccountsTotal(Number(data.total) || 0);
+            }
+
+            setIsLoading(false);
+        };
+
+        fetchDashboard().catch(() => setIsLoading(false));
+
+        return () => {
+            cancelled = true;
+        };
+    }, [token]);
+
+    const disabilityTypes = memberStats?.byDisability ?? [];
 
     return (
-        <main className="h-screen overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
-            <div className="lg:flex lg:h-full lg:overflow-hidden">
-                <Sidebar onLogout={handleLogout} />
-
-                <section className="flex-1 overflow-y-auto p-4 sm:p-6 lg:ml-80">
-                    <div className="min-h-full rounded-3xl border border-slate-200 bg-white p-6 shadow-lg shadow-slate-200/20 dark:border-slate-700 dark:bg-slate-900 dark:shadow-slate-950/20 sm:p-8">
-                        <div className="mb-8">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                                <div>
-                                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-                                        Authenticated area
-                                    </p>
-                                    <h1 className="mt-3 text-3xl font-bold text-slate-900 dark:text-white">
-                                        {panel === 'dashboard'
-                                            ? 'Dashboard'
-                                            : panel === 'list'
-                                                ? 'Member List'
-                                                : 'Accounts'}
-                                    </h1>
-                                </div>
-                                <p className="max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-400">
-                                    Use the sidebar to switch between dashboard views, member list, and account details.
-                                </p>
-                            </div>
-                        </div>
-
-                        {panel === 'dashboard' ? (
-                            <div className="space-y-6">
-                                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 dark:border-slate-700 dark:bg-slate-950">
-                                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Quick overview</h2>
-                                    <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
-                                        Welcome back! This dashboard gives you a quick view of the portal and member activity.
-                                    </p>
-                                </div>
-                                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                                    <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-950">
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">Current section</p>
-                                        <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">Dashboard</p>
-                                    </article>
-                                    <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-950">
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">Members synced</p>
-                                        <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">-</p>
-                                    </article>
-                                    <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-950">
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">Account status</p>
-                                        <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">Active</p>
-                                    </article>
-                                </div>
-                            </div>
-                        ) : panel === 'accounts' ? (
-                            <AccountsManager token={token} />
-                        ) : (
-                            <MembersManager token={token} />
-                        )}
-                    </div>
-                </section>
+        <div className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <SummaryCard icon={<Users size={18} />} label="Total PWD Members" value={memberStats?.total} loading={isLoading} />
+                <SummaryCard icon={<Accessibility size={18} />} label="Total Disabilities" value={disabilityTypes.length} loading={isLoading} />
+                <SummaryCard icon={<BriefcaseBusiness size={18} />} label="Total Accounts" value={accountsTotal} loading={isLoading} />
+                <SummaryCard icon={<Shield size={18} />} label="Total Presidents" value={accountsTotal} loading={isLoading} />
             </div>
-        </main>
+
+            <Card className="p-5">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h2 className="text-base font-semibold text-slate-950 dark:text-white">Disability Breakdown</h2>
+                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Current count for every registered disability type.</p>
+                    </div>
+                    <Badge tone="info">{disabilityTypes.length} types</Badge>
+                </div>
+
+                {isLoading ? (
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {Array.from({ length: 6 }).map((_, index) => (
+                            <Skeleton key={index} className="h-20" />
+                        ))}
+                    </div>
+                ) : disabilityTypes.length > 0 ? (
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {disabilityTypes.map((item) => (
+                            <div key={item.disability} className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                                <p className="line-clamp-1 text-sm font-medium text-slate-700 dark:text-slate-300">{item.disability}</p>
+                                <p className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">{item.count}</p>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="mt-5 rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                        No disability statistics are available yet.
+                    </div>
+                )}
+            </Card>
+        </div>
     );
 }
+
+function SummaryCard({ icon, label, value, loading }: { icon: React.ReactNode; label: string; value?: number | null; loading: boolean }) {
+    return (
+        <Card className="p-5">
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                    {icon}
+                </div>
+                <Badge tone="neutral">Live</Badge>
+            </div>
+            <p className="mt-5 text-sm text-slate-500 dark:text-slate-400">{label}</p>
+            {loading ? <Skeleton className="mt-2 h-8 w-24" /> : <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">{value ?? 0}</p>}
+        </Card>
+    );
+}
+
+export default function DashboardPage() {
+    return (
+        <AppShell title="Dashboard" description="Monitor PWD records, disability totals, and account coverage.">
+            {(token) => <DashboardContent token={token} />}
+        </AppShell>
+    );
+}
+

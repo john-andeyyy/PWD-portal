@@ -22,12 +22,17 @@ export class PermissionsGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest();
     const user = request.user;
+
+    if (user?.isSuperAdmin === true) {
+      return true;
+    }
+
     if (!user || !Array.isArray(user.permissions)) {
       throw new UnauthorizedException("Missing permissions");
     }
 
-    return requiredPermissions.every(
-      (permission) => user.permissions.includes(permission),
+    return requiredPermissions.every((permission) =>
+      user.permissions.includes(permission),
     );
   }
 }

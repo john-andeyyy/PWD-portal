@@ -33,7 +33,9 @@ export class MembersController {
         req.user.userId,
         createMemberDto,
       );
-      this.logger.log(`Successfully created member for user ${req.user.userId}`);
+      this.logger.log(
+        `Successfully created member for user ${req.user.userId}`,
+      );
       return result;
     } catch (error) {
       this.logger.error(
@@ -54,11 +56,17 @@ export class MembersController {
       barangay?: string;
       disability?: string;
       isBedridden?: string;
+      page?: string;
+      limit?: string;
+      sortBy?: "fname" | "lname" | "joinedAt";
+      sortOrder?: "asc" | "desc";
     },
   ) {
     try {
       const result = await this.membersService.findAll(req.user, query);
-      this.logger.log(`Successfully fetched members for user ${req.user.userId}`);
+      this.logger.log(
+        `Successfully fetched members for user ${req.user.userId}`,
+      );
       return result;
     } catch (error) {
       this.logger.error(
@@ -69,14 +77,29 @@ export class MembersController {
     }
   }
 
+  @Get("stats")
+  @Permissions("members.view")
+  async getStats() {
+    try {
+      const result = await this.membersService.getGlobalStats();
+      this.logger.log("Successfully fetched member stats");
+      return result;
+    } catch (error) {
+      this.logger.error(
+        "Issue while fetching member stats",
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
+  }
+
   @Get(":id")
   @Permissions("members.view")
   async findOne(@Request() req: any, @Param("id") id: string) {
     try {
-      const memberId = Number(id);
-      const result = await this.membersService.findOne(req.user, memberId);
+      const result = await this.membersService.findOne(req.user, id);
       this.logger.log(
-        `Successfully fetched member ${memberId} for user ${req.user.userId}`,
+        `Successfully fetched member ${id} for user ${req.user.userId}`,
       );
       return result;
     } catch (error) {
@@ -96,14 +119,13 @@ export class MembersController {
     @Body() updateMemberDto: UpdateMemberDto,
   ) {
     try {
-      const memberId = Number(id);
       const result = await this.membersService.update(
         req.user,
-        memberId,
+        id,
         updateMemberDto,
       );
       this.logger.log(
-        `Successfully updated member ${memberId} for user ${req.user.userId}`,
+        `Successfully updated member ${id} for user ${req.user.userId}`,
       );
       return result;
     } catch (error) {
@@ -119,10 +141,9 @@ export class MembersController {
   @Permissions("members.delete")
   async remove(@Request() req: any, @Param("id") id: string) {
     try {
-      const memberId = Number(id);
-      const result = await this.membersService.remove(req.user, memberId);
+      const result = await this.membersService.remove(req.user, id);
       this.logger.log(
-        `Successfully deleted member ${memberId} for user ${req.user.userId}`,
+        `Successfully deleted member ${id} for user ${req.user.userId}`,
       );
       return result;
     } catch (error) {

@@ -30,32 +30,38 @@ export class PresidentsService {
         email: data.email,
         password: hashedPassword,
         isEnabled: data.isEnabled ?? true,
-        role: data.roleId ? { connect: { id: data.roleId } } : undefined,
-        member: data.memberId ? { connect: { id: data.memberId } } : undefined,
+        isSuperAdmin: data.isSuperAdmin ?? false,
+        role: data.roleId ? { connect: { id: data.roleId as any } } : undefined,
+        member: data.memberId
+          ? { connect: { id: data.memberId as any } }
+          : undefined,
       },
       include: { role: true, member: true },
     });
   }
 
-  async update(id: number, data: UpdatePresidentDto) {
-    const president = await this.prisma.president.findUnique({ where: { id } });
+  async update(id: string, data: UpdatePresidentDto) {
+    const president = await this.prisma.president.findUnique({
+      where: { id: id as any },
+    });
     if (!president) {
       throw new NotFoundException("President not found");
     }
 
     return this.prisma.president.update({
-      where: { id },
+      where: { id: id as any },
       data: {
         name: data.name,
         email: data.email,
         isEnabled: data.isEnabled,
+        isSuperAdmin: data.isSuperAdmin,
         role: data.roleId
-          ? { connect: { id: data.roleId } }
+          ? { connect: { id: data.roleId as any } }
           : data.roleId === null
             ? { disconnect: true }
             : undefined,
         member: data.memberId
-          ? { connect: { id: data.memberId } }
+          ? { connect: { id: data.memberId as any } }
           : data.memberId === null
             ? { disconnect: true }
             : undefined,

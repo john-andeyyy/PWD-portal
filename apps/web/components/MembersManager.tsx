@@ -9,7 +9,7 @@ import { parseMemberImportText, type MemberImportRow } from '@/lib/member-import
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
 
 interface Member {
-    id: number;
+    id: string;
     fname: string;
     lname: string;
     mname?: string;
@@ -72,11 +72,34 @@ interface MembersManagerProps {
 }
 
 interface MeResponse {
-    userId: number;
+    userId: string;
     email: string;
     role: string;
     permissions: string[];
 }
+
+interface MembersPager {
+    data: Member[];
+    total: number;
+    page: number;
+    limit: number;
+}
+
+const parseApiError = async (response: Response) => {
+    try {
+        const body = await response.json();
+        if (Array.isArray(body?.message)) {
+            return body.message.join(', ');
+        }
+        if (typeof body?.message === 'string' && body.message.trim() !== '') {
+            return body.message;
+        }
+    } catch {
+        // Ignore malformed response bodies.
+    }
+
+    return response.statusText || 'Request failed.';
+};
 
 export function MembersManager({ token }: MembersManagerProps) {
     const [members, setMembers] = useState<Member[]>([]);
@@ -95,7 +118,8 @@ export function MembersManager({ token }: MembersManagerProps) {
     const [memberDisability, setMemberDisability] = useState('');
     const [memberBedridden, setMemberBedridden] = useState('');
     const [isEditingMember, setIsEditingMember] = useState(false);
-    const [editingMemberId, setEditingMemberId] = useState<number | null>(null);
+    const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+    const [pager, setPager] = useState<MembersPager>({ data: [], total: 0, page: 1, limit: 10 });
 
     const DISABILITIES = [
         'CANCER (RA 11215)',
@@ -170,6 +194,11 @@ export function MembersManager({ token }: MembersManagerProps) {
             params.set('isBedridden', memberBedridden);
         }
 
+        params.set('page', String(currentPage));
+        params.set('limit', String(pageSize));
+        params.set('sortBy', 'lname');
+        params.set('sortOrder', 'asc');
+
         return params.toString();
     };
 
@@ -201,10 +230,24 @@ export function MembersManager({ token }: MembersManagerProps) {
         const response = await fetch(`${apiBaseUrl}/members${queryString ? `?${queryString}` : ''}`, {
             headers: { Authorization: `Bearer ${token}` }
         });
-        if (response.ok) {
-            setMembers(await response.json());
-            setCurrentPage(1);
+        if (!response.ok) {
+            setStatus(await parseApiError(response));
+            return;
         }
+
+        const data = await response.json();
+        const list = Array.isArray(data) ? data : data.data;
+        setMembers(Array.isArray(list) ? list : []);
+        setPager(
+            Array.isArray(data)
+                ? { data: list, total: list.length, page: 1, limit: list.length || pageSize }
+                : {
+                    data: Array.isArray(data.data) ? data.data : [],
+                    total: Number(data.total) || 0,
+                    page: Number(data.page) || currentPage,
+                    limit: Number(data.limit) || pageSize,
+                },
+        );
     };
 
     const fetchMe = async () => {
@@ -230,7 +273,11 @@ export function MembersManager({ token }: MembersManagerProps) {
         }
 
         fetchMembers();
-    }, [token, memberSearch, memberBarangay, memberDisability, memberBedridden]);
+    }, [token, memberSearch, memberBarangay, memberDisability, memberBedridden, currentPage]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [memberSearch, memberBarangay, memberDisability, memberBedridden]);
 
     const createMemberFromPayload = async (payload: MemberImportRow['payload']) => {
         if (!payload) {
@@ -294,8 +341,8 @@ export function MembersManager({ token }: MembersManagerProps) {
                     continue;
                 }
 
-                const errorText = await response.text();
-                failedRows.push(`Row ${row.rowNumber}: ${errorText || response.statusText || 'failed to insert'}`);
+                const errorText = await parseApiError(response);
+                failedRows.push(`Row ${row.rowNumber}: ${errorText || 'failed to insert'}`);
             }
 
             const skippedCount = skippedRows.length;
@@ -380,13 +427,13 @@ export function MembersManager({ token }: MembersManagerProps) {
                 ? `${apiBaseUrl}/members/${editingMemberId}`
                 : `${apiBaseUrl}/members`,
             {
-            method: isEditingMember ? 'PUT' : 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify(form)
-        }
+                method: isEditingMember ? 'PUT' : 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify(form)
+            }
         );
 
         if (response.ok) {
@@ -395,7 +442,8 @@ export function MembersManager({ token }: MembersManagerProps) {
             fetchMembers();
             return;
         }
-        setStatus(isEditingMember ? 'Failed to update member.' : 'Failed to create member.');
+        const errorMessage = await parseApiError(response);
+        setStatus(isEditingMember ? `Failed to update member: ${errorMessage}` : `Failed to create member: ${errorMessage}`);
     };
 
     return (
@@ -542,7 +590,7 @@ export function MembersManager({ token }: MembersManagerProps) {
                     ) : null}
                     {importRows.length > 0 ? (
                         <p className="mt-2 text-xs text-sky-800/80 dark:text-sky-200/80">
-                            Parsed {importRows.length} row(s). Blank bedridden values were saved as false.
+                            Parsed {importRows.length} row(s). Blank bedridden values are saved as false.
                         </p>
                     ) : null}
                 </div>
@@ -589,9 +637,7 @@ export function MembersManager({ token }: MembersManagerProps) {
                                     </td>
                                 </tr>
                             ) : (
-                                // client-side pagination
                                 members
-                                    .slice((currentPage - 1) * pageSize, currentPage * pageSize)
                                     .map((member) => (
                                         <tr
                                             key={member.id}
@@ -642,7 +688,7 @@ export function MembersManager({ token }: MembersManagerProps) {
                 </div>
 
                 {/* Pagination controls */}
-                {members.length > pageSize ? (
+                {pager.total > pager.limit ? (
                     <div className="flex items-center justify-end gap-3 px-4 py-3">
                         <button
                             onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -652,12 +698,12 @@ export function MembersManager({ token }: MembersManagerProps) {
                             Prev
                         </button>
 
-                        <span className="text-sm text-slate-600 dark:text-slate-400">Page {currentPage} of {Math.ceil(members.length / pageSize)}</span>
+                        <span className="text-sm text-slate-600 dark:text-slate-400">Page {currentPage} of {Math.max(1, Math.ceil(pager.total / pager.limit))}</span>
 
                         <button
-                            onClick={() => setCurrentPage((p) => Math.min(Math.ceil(members.length / pageSize), p + 1))}
+                            onClick={() => setCurrentPage((p) => Math.min(Math.max(1, Math.ceil(pager.total / pager.limit)), p + 1))}
                             className="rounded-md border px-3 py-1 text-sm"
-                            disabled={currentPage === Math.ceil(members.length / pageSize)}
+                            disabled={currentPage === Math.max(1, Math.ceil(pager.total / pager.limit))}
                         >
                             Next
                         </button>

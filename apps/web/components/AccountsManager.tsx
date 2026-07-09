@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { cn } from '@pwd/ui';
 import { fetchPermissionCatalog, hasPermission, PermissionCatalogItem } from '@/lib/rbac';
 
@@ -9,40 +10,40 @@ const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:300
 type Tab = 'president' | 'role';
 
 interface MeResponse {
-    userId: number;
+    userId: string;
     email: string;
-    roleId?: number | null;
+    roleId?: string | null;
     roleName?: string | null;
     permissions: string[];
 }
 
 interface Role {
-    id: number;
+    id: string;
     name: string;
     permissions: string[];
 }
 
 interface PresidentItem {
-    id: number;
+    id: string;
     name: string;
     email: string;
     isEnabled: boolean;
-    memberId?: number | null;
+    memberId?: string | null;
     member?: {
-        id: number;
+        id: string;
         fname: string;
         lname: string;
         pwdId: string;
     } | null;
     role?: {
-        id: number;
+        id: string;
         name: string;
     } | null;
     createdAt: string;
 }
 
 interface MemberOption {
-    id: number;
+    id: string;
     fname: string;
     lname: string;
     pwdId: string;
@@ -69,10 +70,6 @@ export function AccountsManager({ token }: { token: string }) {
     const [presidentPager, setPresidentPager] = useState<Pager>({ data: [], total: 0, page: 1, limit: 5 });
     const [rolePager, setRolePager] = useState<Pager>({ data: [], total: 0, page: 1, limit: 5 });
     const [presidentForm, setPresidentForm] = useState({ name: '', email: '', password: '', roleId: '', memberId: '', isEnabled: true });
-    const [roleForm, setRoleForm] = useState<{ name: string; permissions: string[] }>({
-        name: '',
-        permissions: [],
-    });
 
     const canManageRoles = hasPermission(user?.permissions, 'accounts.manage');
 
@@ -105,7 +102,7 @@ export function AccountsManager({ token }: { token: string }) {
     };
 
     const fetchMembers = async () => {
-        const response = await fetch(`${apiBaseUrl}/members`, {
+        const response = await fetch(`${apiBaseUrl}/members?page=1&limit=5000&sortBy=lname&sortOrder=asc`, {
             headers: {
                 Authorization: `Bearer ${token}`,
             },
@@ -117,7 +114,7 @@ export function AccountsManager({ token }: { token: string }) {
         }
 
         const data = await response.json();
-        setMembers(data || []);
+        setMembers(Array.isArray(data) ? data : data.data || []);
     };
 
     const fetchRoles = async (page = 1) => {
@@ -140,16 +137,6 @@ export function AccountsManager({ token }: { token: string }) {
             const catalog = await fetchPermissionCatalog(apiBaseUrl);
             setPermissionCatalog(catalog);
 
-            setRoleForm((current) => {
-                if (current.permissions.length > 0 || catalog.length === 0) {
-                    return current;
-                }
-
-                return {
-                    ...current,
-                    permissions: [catalog[0].key],
-                };
-            });
         } catch {
             setStatus('Unable to load permission catalog.');
         }
@@ -173,8 +160,8 @@ export function AccountsManager({ token }: { token: string }) {
             name: presidentForm.name,
             email: presidentForm.email,
             password: presidentForm.password,
-            roleId: presidentForm.roleId ? Number(presidentForm.roleId) : undefined,
-            memberId: presidentForm.memberId ? Number(presidentForm.memberId) : undefined,
+            roleId: presidentForm.roleId || undefined,
+            memberId: presidentForm.memberId || undefined,
             isEnabled: presidentForm.isEnabled,
         };
 
@@ -195,31 +182,6 @@ export function AccountsManager({ token }: { token: string }) {
         setStatus('President account created.');
         setPresidentForm({ name: '', email: '', password: '', roleId: '', memberId: '', isEnabled: true });
         fetchPresidents(1);
-    };
-
-    const handleCreateRole = async (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        setStatus('Creating role...');
-        const response = await fetch(`${apiBaseUrl}/roles`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(roleForm),
-        });
-
-        if (!response.ok) {
-            setStatus('Failed to create role.');
-            return;
-        }
-
-        setStatus('Role created successfully.');
-        setRoleForm({
-            name: '',
-            permissions: permissionCatalog[0] ? [permissionCatalog[0].key] : [],
-        });
-        fetchRoles(1);
     };
 
     const handleTogglePresidentStatus = async (president: PresidentItem) => {
@@ -246,7 +208,7 @@ export function AccountsManager({ token }: { token: string }) {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify({ roleId: roleId ? Number(roleId) : null }),
+            body: JSON.stringify({ roleId: roleId || null }),
         });
 
         if (!response.ok) {
@@ -446,7 +408,7 @@ export function AccountsManager({ token }: { token: string }) {
 
 
 
-                    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 shadow-sm dark:border-slate-700 dark:bg-slate-950">
+                    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
                         <div className="flex flex-col gap-3 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white">President accounts</h2>
@@ -533,45 +495,20 @@ export function AccountsManager({ token }: { token: string }) {
                 </div>
             ) : (
                 <div className="space-y-6">
-                    <div className="rounded-3xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-950">
-                        <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Create a new role</h2>
-                        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Add a role and choose the permissions it should grant.</p>
-                        <form onSubmit={handleCreateRole} className="mt-6 space-y-4">
-                            <input
-                                value={roleForm.name}
-                                onChange={(event) => setRoleForm({ ...roleForm, name: event.target.value })}
-                                placeholder="Role key"
-                                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                                required
-                            />
-                            <div className="grid gap-3 sm:grid-cols-2">
-                                {permissionCatalog.map((permission) => (
-                                    <label key={permission.key} className="inline-flex items-center gap-3 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-                                        <input
-                                            type="checkbox"
-                                            checked={roleForm.permissions.includes(permission.key)}
-                                            onChange={(event) => {
-                                                const nextPermissions = event.target.checked
-                                                    ? [...roleForm.permissions, permission.key]
-                                                    : roleForm.permissions.filter((item) => item !== permission.key);
-                                                setRoleForm({ ...roleForm, permissions: Array.from(new Set(nextPermissions)) });
-                                            }}
-                                            className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                                        />
-                                        {permission.displayName}
-                                    </label>
-                                ))}
-                            </div>
-                            <button
-                                type="submit"
-                                className="inline-flex items-center justify-center rounded-2xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700"
-                            >
-                                Create role
-                            </button>
-                        </form>
+                    <div className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h2 className="text-lg font-semibold text-slate-950 dark:text-white">Roles</h2>
+                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Review roles first. Use the create page when you need to add a new one.</p>
+                        </div>
+                        <Link
+                            href="/roles"
+                            className="inline-flex h-10 items-center justify-center rounded-lg bg-slate-950 px-4 text-sm font-medium text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+                        >
+                            Create role
+                        </Link>
                     </div>
 
-                    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 shadow-sm dark:border-slate-700 dark:bg-slate-950">
+                    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
                         <div className="flex flex-col gap-3 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Roles</h2>
@@ -643,4 +580,5 @@ export function AccountsManager({ token }: { token: string }) {
         </div>
     );
 }
+
 

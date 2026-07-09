@@ -5,7 +5,7 @@ import {
   IsString,
   MaxLength,
   MinLength,
-  IsInt,
+  IsUUID,
 } from "class-validator";
 
 export class CreatePresidentDto {
@@ -21,14 +21,18 @@ export class CreatePresidentDto {
   password: string;
 
   @IsOptional()
-  @IsInt()
-  roleId?: number;
+  @IsUUID()
+  roleId?: string;
 
   @IsOptional()
   @IsBoolean()
   isEnabled?: boolean;
 
   @IsOptional()
-  @IsInt()
-  memberId?: number;
+  @IsBoolean()
+  isSuperAdmin?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  memberId?: string;
 }

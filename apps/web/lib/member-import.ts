@@ -9,7 +9,7 @@ export interface MemberImportPayload {
   barangay: string;
   isBedridden: boolean;
   pwdId: string;
-  dateIssued: string;
+  dateIssued?: string;
   gender: string;
 }
 
@@ -230,11 +230,7 @@ export const parseMemberImportText = (text: string): MemberImportResult => {
       errors.push("Birthday is missing or invalid.");
     }
 
-    let dateIssued = toIsoDate(rawValues.dateIssued ?? "");
-    if (!dateIssued) {
-      dateIssued = new Date().toISOString().slice(0, 10);
-      warnings.push("Date issued was empty, so today was used.");
-    }
+    const dateIssued = toIsoDate(rawValues.dateIssued ?? "");
 
     if (!fname) {
       errors.push("First name is required.");
@@ -278,7 +274,7 @@ export const parseMemberImportText = (text: string): MemberImportResult => {
             barangay,
             isBedridden: toBoolean(rawValues.isBedridden ?? ""),
             pwdId,
-            dateIssued,
+            dateIssued: dateIssued ?? undefined,
             gender,
           };
 

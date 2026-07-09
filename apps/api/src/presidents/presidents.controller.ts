@@ -64,12 +64,11 @@ export class PresidentsController {
     @Body() updatePresidentDto: UpdatePresidentDto,
   ) {
     try {
-      const presidentId = Number(id);
       const result = await this.presidentsService.update(
-        presidentId,
+        id,
         updatePresidentDto,
       );
-      this.logger.log(`Successfully updated president ${presidentId}`);
+      this.logger.log(`Successfully updated president ${id}`);
       return result;
     } catch (error) {
       this.logger.error(

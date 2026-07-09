@@ -4,7 +4,7 @@ import {
   IsOptional,
   IsString,
   MaxLength,
-  IsInt,
+  IsUUID,
 } from "class-validator";
 
 export class UpdatePresidentDto {
@@ -18,14 +18,18 @@ export class UpdatePresidentDto {
   email?: string;
 
   @IsOptional()
-  @IsInt()
-  roleId?: number | null;
+  @IsUUID()
+  roleId?: string | null;
 
   @IsOptional()
-  @IsInt()
-  memberId?: number | null;
+  @IsUUID()
+  memberId?: string | null;
 
   @IsOptional()
   @IsBoolean()
   isEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isSuperAdmin?: boolean;
 }
