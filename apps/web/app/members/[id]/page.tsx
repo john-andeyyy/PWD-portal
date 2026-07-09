@@ -74,6 +74,18 @@ export default function MemberDetailPage() {
         return age;
     }
 
+    function formatDateDisplay(value?: string | null) {
+        if (!value) return "-";
+
+        const parsedDate = new Date(value);
+
+        if (Number.isNaN(parsedDate.getTime())) {
+            return "-";
+        }
+
+        return parsedDate.toLocaleDateString();
+    }
+
     const initials = useMemo(() => {
         if (!member) return "";
 
@@ -166,6 +178,12 @@ export default function MemberDetailPage() {
                                             ? new Date(member.bday).toLocaleDateString()
                                             : "-"
                                     }
+                                />
+
+                                <InfoCard
+                                    icon={<Calendar size={22} />}
+                                    title="Date Issued"
+                                    value={formatDateDisplay(member.dateIssued)}
                                 />
 
                                 <InfoCard

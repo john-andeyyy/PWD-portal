@@ -24,6 +24,49 @@ interface Member {
     gender: string;
 }
 
+type MemberFormState = {
+    fname: string;
+    lname: string;
+    mname: string;
+    bday: string;
+    disability: string;
+    phoneNumber: string;
+    address: string;
+    barangay: string;
+    isBedridden: boolean;
+    pwdId: string;
+    dateIssued: string;
+    gender: string;
+};
+
+const EMPTY_MEMBER_FORM: MemberFormState = {
+    fname: '',
+    lname: '',
+    mname: '',
+    bday: '',
+    disability: '',
+    phoneNumber: '',
+    address: '',
+    barangay: '',
+    isBedridden: false,
+    pwdId: '',
+    dateIssued: '',
+    gender: ''
+};
+
+const formatDateDisplay = (value?: string | null) => {
+    if (!value) {
+        return '-';
+    }
+
+    const parsedDate = new Date(value);
+    if (Number.isNaN(parsedDate.getTime())) {
+        return '-';
+    }
+
+    return parsedDate.toLocaleDateString();
+};
+
 interface MembersManagerProps {
     token: string;
 }
@@ -43,23 +86,16 @@ export function MembersManager({ token }: MembersManagerProps) {
     const [importErrors, setImportErrors] = useState<string[]>([]);
     const [importWarnings, setImportWarnings] = useState<string[]>([]);
     const [isImporting, setIsImporting] = useState(false);
-    const [form, setForm] = useState({
-        fname: '',
-        lname: '',
-        mname: '',
-        bday: '',
-        disability: '',
-        phoneNumber: '',
-        address: '',
-        barangay: '',
-        isBedridden: false,
-        pwdId: '',
-        dateIssued: '',
-        gender: ''
-    });
+    const [form, setForm] = useState<MemberFormState>(EMPTY_MEMBER_FORM);
     const [otherDisability, setOtherDisability] = useState('');
     const [user, setUser] = useState<MeResponse | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const [memberSearch, setMemberSearch] = useState('');
+    const [memberBarangay, setMemberBarangay] = useState('');
+    const [memberDisability, setMemberDisability] = useState('');
+    const [memberBedridden, setMemberBedridden] = useState('');
+    const [isEditingMember, setIsEditingMember] = useState(false);
+    const [editingMemberId, setEditingMemberId] = useState<number | null>(null);
 
     const DISABILITIES = [
         'CANCER (RA 11215)',
@@ -108,6 +144,35 @@ export function MembersManager({ token }: MembersManagerProps) {
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 10;
 
+    const resetMemberForm = () => {
+        setForm(EMPTY_MEMBER_FORM);
+        setOtherDisability('');
+        setIsEditingMember(false);
+        setEditingMemberId(null);
+    };
+
+    const buildMemberQuery = () => {
+        const params = new URLSearchParams();
+
+        if (memberSearch.trim()) {
+            params.set('search', memberSearch.trim());
+        }
+
+        if (memberBarangay.trim()) {
+            params.set('barangay', memberBarangay.trim());
+        }
+
+        if (memberDisability.trim()) {
+            params.set('disability', memberDisability.trim());
+        }
+
+        if (memberBedridden) {
+            params.set('isBedridden', memberBedridden);
+        }
+
+        return params.toString();
+    };
+
     const resetImportState = () => {
         setImportRows([]);
         setImportMessage(null);
@@ -132,7 +197,8 @@ export function MembersManager({ token }: MembersManagerProps) {
     };
 
     const fetchMembers = async () => {
-        const response = await fetch(`${apiBaseUrl}/members`, {
+        const queryString = buildMemberQuery();
+        const response = await fetch(`${apiBaseUrl}/members${queryString ? `?${queryString}` : ''}`, {
             headers: { Authorization: `Bearer ${token}` }
         });
         if (response.ok) {
@@ -155,9 +221,16 @@ export function MembersManager({ token }: MembersManagerProps) {
     useEffect(() => {
         if (token) {
             fetchMe();
-            fetchMembers();
         }
     }, [token]);
+
+    useEffect(() => {
+        if (!token) {
+            return;
+        }
+
+        fetchMembers();
+    }, [token, memberSearch, memberBarangay, memberDisability, memberBedridden]);
 
     const createMemberFromPayload = async (payload: MemberImportRow['payload']) => {
         if (!payload) {
@@ -263,41 +336,66 @@ export function MembersManager({ token }: MembersManagerProps) {
         );
     }
 
-    const createMember = async (event: FormEvent<HTMLFormElement>) => {
+    const openCreateMemberModal = () => {
+        resetMemberForm();
+        setStatus(null);
+        setStep(1);
+        setIsModalOpen(true);
+    };
+
+    const openEditMemberModal = (member: Member) => {
+        setForm({
+            fname: member.fname,
+            lname: member.lname,
+            mname: member.mname ?? '',
+            bday: member.bday?.slice(0, 10) ?? '',
+            disability: member.disability,
+            phoneNumber: member.phoneNumber,
+            address: member.address,
+            barangay: member.barangay ?? '',
+            isBedridden: member.isBedridden,
+            pwdId: member.pwdId,
+            dateIssued: member.dateIssued?.slice(0, 10) ?? '',
+            gender: member.gender
+        });
+        setOtherDisability(DISABILITIES.includes(member.disability) ? '' : member.disability);
+        setIsEditingMember(true);
+        setEditingMemberId(member.id);
+        setStatus(null);
+        setStep(1);
+        setIsModalOpen(true);
+    };
+
+    const closeMemberModal = () => {
+        setIsModalOpen(false);
+        setStep(1);
+        resetMemberForm();
+    };
+
+    const submitMember = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        setStatus('Creating member...');
-        const response = await fetch(`${apiBaseUrl}/members`, {
-            method: 'POST',
+        setStatus(isEditingMember ? 'Updating member...' : 'Creating member...');
+        const response = await fetch(
+            isEditingMember && editingMemberId !== null
+                ? `${apiBaseUrl}/members/${editingMemberId}`
+                : `${apiBaseUrl}/members`,
+            {
+            method: isEditingMember ? 'PUT' : 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${token}`
             },
             body: JSON.stringify(form)
-        });
+        }
+        );
 
         if (response.ok) {
-            // setStatus('Member created successfully.');
-            setForm({
-                fname: '',
-                lname: '',
-                mname: '',
-                bday: '',
-                disability: '',
-                barangay: '',
-                phoneNumber: '',
-                address: '',
-                isBedridden: false,
-                pwdId: '',
-                dateIssued: '',
-                gender: ''
-            });
-            setOtherDisability('');
-            setIsModalOpen(false);
-            setStep(1);
+            setStatus(isEditingMember ? 'Member updated successfully.' : 'Member created successfully.');
+            closeMemberModal();
             fetchMembers();
             return;
         }
-        setStatus('Failed to create member.');
+        setStatus(isEditingMember ? 'Failed to update member.' : 'Failed to create member.');
     };
 
     return (
@@ -331,25 +429,7 @@ export function MembersManager({ token }: MembersManagerProps) {
                     {canCreateMembers ? (
                         <button
                             type="button"
-                            onClick={() => {
-                                setForm({
-                                    fname: '',
-                                    lname: '',
-                                    mname: '',
-                                    bday: '',
-                                    disability: '',
-                                    barangay: '',
-                                    phoneNumber: '',
-                                    address: '',
-                                    isBedridden: false,
-                                    pwdId: '',
-                                    dateIssued: '',
-                                    gender: ''
-                                });
-                                setStatus(null);
-                                setStep(1);
-                                setIsModalOpen(true);
-                            }}
+                            onClick={openCreateMemberModal}
                             className={cn(
                                 'rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition',
                                 'hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-500/40',
@@ -360,6 +440,79 @@ export function MembersManager({ token }: MembersManagerProps) {
                         </button>
                     ) : null}
                 </div>
+            </div>
+
+            <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40 lg:grid-cols-5">
+                <label className="space-y-2 lg:col-span-2">
+                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Search</span>
+                    <input
+                        value={memberSearch}
+                        onChange={(event) => setMemberSearch(event.target.value)}
+                        placeholder="Search by name, PWD ID, or phone"
+                        className={cn(
+                            'w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-slate-900 placeholder-slate-500 outline-none transition',
+                            'focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20',
+                            'dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:placeholder-slate-400'
+                        )}
+                    />
+                </label>
+
+                <label className="space-y-2">
+                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Barangay</span>
+                    <select
+                        value={memberBarangay}
+                        onChange={(event) => setMemberBarangay(event.target.value)}
+                        className={cn(
+                            'w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-slate-900 outline-none transition',
+                            'focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20',
+                            'dark:border-slate-600 dark:bg-slate-900 dark:text-white'
+                        )}
+                    >
+                        <option value="">All barangays</option>
+                        {BARANGAYS.map((barangay) => (
+                            <option key={barangay} value={barangay}>
+                                {barangay}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+
+                <label className="space-y-2">
+                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Disability</span>
+                    <select
+                        value={memberDisability}
+                        onChange={(event) => setMemberDisability(event.target.value)}
+                        className={cn(
+                            'w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-slate-900 outline-none transition',
+                            'focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20',
+                            'dark:border-slate-600 dark:bg-slate-900 dark:text-white'
+                        )}
+                    >
+                        <option value="">All disabilities</option>
+                        {DISABILITIES.map((disability) => (
+                            <option key={disability} value={disability}>
+                                {disability}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+
+                <label className="space-y-2">
+                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Bedridden</span>
+                    <select
+                        value={memberBedridden}
+                        onChange={(event) => setMemberBedridden(event.target.value)}
+                        className={cn(
+                            'w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-slate-900 outline-none transition',
+                            'focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20',
+                            'dark:border-slate-600 dark:bg-slate-900 dark:text-white'
+                        )}
+                    >
+                        <option value="">All</option>
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                    </select>
+                </label>
             </div>
 
             <input
@@ -398,7 +551,7 @@ export function MembersManager({ token }: MembersManagerProps) {
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
                 <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-700">
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Members Table</h3>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">All existing members are shown here.</p>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Filtered members are shown here.</p>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -420,13 +573,19 @@ export function MembersManager({ token }: MembersManagerProps) {
                                 <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
                                     Phone
                                 </th>
+                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                                    Date Issued
+                                </th>
+                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                                    Actions
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
                             {members.length === 0 ? (
                                 <tr>
-                                    <td className="px-5 py-10 text-sm text-slate-600 dark:text-slate-400" colSpan={5}>
-                                        No members yet. Use the Add Member button to create the first record.
+                                    <td className="px-5 py-10 text-sm text-slate-600 dark:text-slate-400" colSpan={7}>
+                                        No members matched the current search and filters.
                                     </td>
                                 </tr>
                             ) : (
@@ -436,16 +595,45 @@ export function MembersManager({ token }: MembersManagerProps) {
                                     .map((member) => (
                                         <tr
                                             key={member.id}
-                                            className="cursor-pointer transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
-                                            onClick={() => router.push(`/members/${member.id}`)}
+                                            className="transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
                                         >
-                                            <td className="px-5 py-4 text-sm font-medium text-slate-900 dark:text-white">
+                                            <td
+                                                className="cursor-pointer px-5 py-4 text-sm font-medium text-slate-900 dark:text-white"
+                                                onClick={() => router.push(`/members/${member.id}`)}
+                                            >
                                                 {[member.fname, member.mname, member.lname].filter(Boolean).join(' ')}
                                             </td>
-                                            <td className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300">{member.pwdId}</td>
-                                            <td className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300">{member.disability}</td>
-                                            <td className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300">{member.barangay ?? '-'}</td>
-                                            <td className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300">{member.phoneNumber}</td>
+                                            <td className="cursor-pointer px-5 py-4 text-sm text-slate-600 dark:text-slate-300" onClick={() => router.push(`/members/${member.id}`)}>{member.pwdId}</td>
+                                            <td className="cursor-pointer px-5 py-4 text-sm text-slate-600 dark:text-slate-300" onClick={() => router.push(`/members/${member.id}`)}>{member.disability}</td>
+                                            <td className="cursor-pointer px-5 py-4 text-sm text-slate-600 dark:text-slate-300" onClick={() => router.push(`/members/${member.id}`)}>{member.barangay ?? '-'}</td>
+                                            <td className="cursor-pointer px-5 py-4 text-sm text-slate-600 dark:text-slate-300" onClick={() => router.push(`/members/${member.id}`)}>{member.phoneNumber}</td>
+                                            <td className="cursor-pointer px-5 py-4 text-sm text-slate-600 dark:text-slate-300" onClick={() => router.push(`/members/${member.id}`)}>{formatDateDisplay(member.dateIssued)}</td>
+                                            <td className="px-5 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            router.push(`/members/${member.id}`);
+                                                        }}
+                                                        className="rounded-md border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                                                    >
+                                                        View
+                                                    </button>
+                                                    {hasPermission(user?.permissions, 'members.update') ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                openEditMemberModal(member);
+                                                            }}
+                                                            className="rounded-md bg-sky-500 px-3 py-1 text-xs font-semibold text-white transition hover:bg-sky-600 dark:bg-sky-600 dark:hover:bg-sky-500"
+                                                        >
+                                                            Update
+                                                        </button>
+                                                    ) : null}
+                                                </div>
+                                            </td>
                                         </tr>
                                     ))
                             )}
@@ -480,7 +668,7 @@ export function MembersManager({ token }: MembersManagerProps) {
             {isModalOpen ? (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 py-6 backdrop-blur-sm !mt-0"
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={closeMemberModal}
                 >
                     <div
                         role="dialog"
@@ -492,16 +680,13 @@ export function MembersManager({ token }: MembersManagerProps) {
                         <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5 dark:border-slate-700">
                             <div>
                                 <h3 id="add-member-title" className="text-xl font-semibold text-slate-900 dark:text-white">
-                                    Add Member
+                                    {isEditingMember ? 'Update Member' : 'Add Member'}
                                 </h3>
                                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Step {step} of 2 — {step === 1 ? 'Personal info' : 'PWD details'}</p>
                             </div>
                             <button
                                 type="button"
-                                onClick={() => {
-                                    setIsModalOpen(false);
-                                    setStep(1);
-                                }}
+                                onClick={closeMemberModal}
                                 className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white"
                                 aria-label="Close modal"
                             >
@@ -509,7 +694,7 @@ export function MembersManager({ token }: MembersManagerProps) {
                             </button>
                         </div>
 
-                        <form onSubmit={createMember} className="space-y-5 px-6 py-6 overflow-y-auto max-h-[72vh]">
+                        <form onSubmit={submitMember} className="space-y-5 px-6 py-6 overflow-y-auto max-h-[72vh]">
                             <div className="grid gap-4 sm:grid-cols-2">
                                 {step === 1 ? (
                                     <>
@@ -746,10 +931,7 @@ export function MembersManager({ token }: MembersManagerProps) {
                                 <div>
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            setIsModalOpen(false);
-                                            setStep(1);
-                                        }}
+                                        onClick={closeMemberModal}
                                         className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
                                     >
                                         Cancel
@@ -790,7 +972,7 @@ export function MembersManager({ token }: MembersManagerProps) {
                                                 !isStep2Valid() && 'opacity-50 cursor-not-allowed'
                                             )}
                                         >
-                                            Create Member
+                                            {isEditingMember ? 'Update Member' : 'Create Member'}
                                         </button>
                                     )}
                                 </div>

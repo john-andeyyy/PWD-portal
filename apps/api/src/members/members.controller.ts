@@ -7,6 +7,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   Request,
   UseGuards,
 } from "@nestjs/common";
@@ -45,9 +46,18 @@ export class MembersController {
 
   @Get()
   @Permissions("members.view")
-  async findAll(@Request() req: any) {
+  async findAll(
+    @Request() req: any,
+    @Query()
+    query: {
+      search?: string;
+      barangay?: string;
+      disability?: string;
+      isBedridden?: string;
+    },
+  ) {
     try {
-      const result = await this.membersService.findAll(req.user);
+      const result = await this.membersService.findAll(req.user, query);
       this.logger.log(`Successfully fetched members for user ${req.user.userId}`);
       return result;
     } catch (error) {
