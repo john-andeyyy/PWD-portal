@@ -15,7 +15,11 @@ export class AuthService {
       where: { email },
       include: { role: true },
     });
-    if (!president || !president.isEnabled) {
+    if (!president) {
+      throw new UnauthorizedException("Account not found");
+    }
+
+    if (!president.isEnabled) {
       throw new UnauthorizedException("Account disabled ");
     }
 
