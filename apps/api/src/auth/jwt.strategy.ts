@@ -23,23 +23,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException("Account disabled or not found");
     }
 
-    const defaultPermissions = [
-      "members.create",
-      "members.view",
-      "members.update",
-      "members.delete",
-      "accounts.manage",
-    ];
-
-    const permissions = president.role
+    const permissions = Array.isArray(president.role?.permissions)
       ? president.role.permissions
-      : defaultPermissions;
+      : [];
 
     return {
       userId: payload.sub,
       email: payload.email,
-      role: president.role?.name || "admin",
       roleId: president.roleId,
+      roleName: president.role?.name ?? null,
       isEnabled: president.isEnabled,
       permissions,
     };

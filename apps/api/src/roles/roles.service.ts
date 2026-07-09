@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { isAppPermission } from "../auth/permissions.catalog";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateRoleDto } from "./dto/create-role.dto";
 import { UpdateRoleDto } from "./dto/update-role.dto";
@@ -6,6 +7,24 @@ import { UpdateRoleDto } from "./dto/update-role.dto";
 @Injectable()
 export class RolesService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private assertPermissionsAreValid(permissions?: string[]) {
+    if (!permissions || permissions.length === 0) {
+      return [];
+    }
+
+    const invalidPermissions = permissions.filter(
+      (permission) => !isAppPermission(permission),
+    );
+
+    if (invalidPermissions.length > 0) {
+      throw new BadRequestException(
+        `Invalid permissions: ${invalidPermissions.join(", ")}`,
+      );
+    }
+
+    return permissions;
+  }
 
   async findAll(page: number, limit: number) {
     const [data, total] = await Promise.all([
@@ -21,10 +40,12 @@ export class RolesService {
   }
 
   async create(data: CreateRoleDto) {
+    const permissions = this.assertPermissionsAreValid(data.permissions);
+
     return this.prisma.role.create({
       data: {
         name: data.name,
-        permissions: data.permissions ?? [],
+        permissions,
       },
     });
   }
@@ -35,11 +56,15 @@ export class RolesService {
       throw new NotFoundException("Role not found");
     }
 
+    const permissions = data.permissions
+      ? this.assertPermissionsAreValid(data.permissions)
+      : undefined;
+
     return this.prisma.role.update({
       where: { id },
       data: {
         name: data.name,
-        permissions: data.permissions,
+        permissions,
       },
     });
   }

@@ -3,14 +3,15 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@pwd/ui';
-import { APP_PERMISSIONS, AppPermission, hasPermission } from '@/lib/rbac';
+import { fetchPermissionCatalog, hasPermission, PermissionCatalogItem } from '@/lib/rbac';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
 
 interface MeResponse {
     userId: number;
     email: string;
-    role: string;
+    roleId?: number | null;
+    roleName?: string | null;
     permissions: string[];
 }
 
@@ -33,20 +34,13 @@ export default function RolesPage() {
     const [status, setStatus] = useState<string | null>(null);
     const [user, setUser] = useState<MeResponse | null>(null);
     const [roles, setRoles] = useState<Role[]>([]);
+    const [permissionCatalog, setPermissionCatalog] = useState<PermissionCatalogItem[]>([]);
     const [page, setPage] = useState(1);
     const [pager, setPager] = useState<Pager>({ data: [], total: 0, page: 1, limit: 5 });
     const [form, setForm] = useState({
         name: '',
-        permissions: ['members.view'] as AppPermission[],
+        permissions: [] as string[],
     });
-
-    const permissionLabels: Record<AppPermission, string> = {
-        'members.create': 'Create members',
-        'members.view': 'View members',
-        'members.update': 'Update members',
-        'members.delete': 'Delete members',
-        'accounts.manage': 'Manage accounts and roles',
-    };
 
     const fetchMe = async () => {
         if (!token) return;
@@ -80,6 +74,26 @@ export default function RolesPage() {
         setPager(data);
     };
 
+    const fetchPermissions = async () => {
+        try {
+            const catalog = await fetchPermissionCatalog(apiBaseUrl);
+            setPermissionCatalog(catalog);
+
+            setForm((current) => {
+                if (current.permissions.length > 0 || catalog.length === 0) {
+                    return current;
+                }
+
+                return {
+                    ...current,
+                    permissions: [catalog[0].key],
+                };
+            });
+        } catch {
+            setStatus('Unable to load permission catalog.');
+        }
+    };
+
     useEffect(() => {
         const storedToken = localStorage.getItem('auth_token');
         if (!storedToken) {
@@ -93,6 +107,7 @@ export default function RolesPage() {
         if (token) {
             fetchMe();
             fetchRoles(page);
+            fetchPermissions();
         }
     }, [token, page]);
 
@@ -118,13 +133,13 @@ export default function RolesPage() {
         setStatus('Role created successfully.');
         setForm({
             name: '',
-            permissions: ['members.view'],
+            permissions: permissionCatalog[0] ? [permissionCatalog[0].key] : [],
         });
         fetchRoles(1);
         setPage(1);
     };
 
-    const handleTogglePermission = async (role: Role, permission: AppPermission) => {
+    const handleTogglePermission = async (role: Role, permission: string) => {
         if (!token) return;
 
         const nextPermissions = role.permissions.includes(permission)
@@ -204,25 +219,25 @@ export default function RolesPage() {
                             <input
                                 value={form.name}
                                 onChange={(event) => setForm({ ...form, name: event.target.value })}
-                                placeholder="Role name"
+                                placeholder="Role key"
                                 className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                                 required
                             />
                             <div className="grid gap-3 sm:grid-cols-2">
-                                {APP_PERMISSIONS.map((permission) => (
-                                    <label key={permission} className="inline-flex items-center gap-3 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                                {permissionCatalog.map((permission) => (
+                                    <label key={permission.key} className="inline-flex items-center gap-3 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
                                         <input
                                             type="checkbox"
-                                            checked={form.permissions.includes(permission)}
+                                            checked={form.permissions.includes(permission.key)}
                                             onChange={(event) => {
                                                 const nextPermissions = event.target.checked
-                                                    ? [...form.permissions, permission]
-                                                    : form.permissions.filter((item) => item !== permission);
-                                                setForm({ ...form, permissions: Array.from(new Set(nextPermissions)) as AppPermission[] });
+                                                    ? [...form.permissions, permission.key]
+                                                    : form.permissions.filter((item) => item !== permission.key);
+                                                setForm({ ...form, permissions: Array.from(new Set(nextPermissions)) });
                                             }}
                                             className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
                                         />
-                                        {permissionLabels[permission]}
+                                        {permission.displayName}
                                     </label>
                                 ))}
                             </div>
@@ -248,30 +263,32 @@ export default function RolesPage() {
                                 <thead className="bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300">
                                     <tr>
                                         <th className="px-6 py-3">Role</th>
-                                        {APP_PERMISSIONS.map((permission) => (
-                                            <th key={permission} className="px-6 py-3">{permission}</th>
+                                        {permissionCatalog.map((permission) => (
+                                            <th key={permission.key} className="px-6 py-3">{permission.displayName}</th>
                                         ))}
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {roles.map((role) => (
                                         <tr key={role.id} className="border-t border-slate-200 dark:border-slate-700">
-                                            <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">{role.name}</td>
-                                            {APP_PERMISSIONS.map((permission) => (
-                                                <td key={permission} className="px-6 py-4">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleTogglePermission(role, permission)}
-                                                        className={cn(
-                                                            'rounded-full px-3 py-1 text-xs font-semibold transition',
-                                                            role.permissions.includes(permission)
-                                                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200'
-                                                                : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200',
-                                                        )}
-                                                    >
-                                                        {role.permissions.includes(permission) ? 'On' : 'Off'}
-                                                    </button>
-                                                </td>
+                                            <td className="px-6 py-4">
+                                                <div className="font-semibold text-slate-900 dark:text-white">{role.name}</div>
+                                            </td>
+                                            {permissionCatalog.map((permission) => (
+                                                    <td key={permission.key} className="px-6 py-4">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleTogglePermission(role, permission.key)}
+                                                            className={cn(
+                                                                'rounded-full px-3 py-1 text-xs font-semibold transition',
+                                                                role.permissions.includes(permission.key)
+                                                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200'
+                                                                    : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200',
+                                                            )}
+                                                        >
+                                                            {role.permissions.includes(permission.key) ? 'On' : 'Off'}
+                                                        </button>
+                                                    </td>
                                             ))}
                                         </tr>
                                     ))}
@@ -305,3 +322,4 @@ export default function RolesPage() {
         </main>
     );
 }
+

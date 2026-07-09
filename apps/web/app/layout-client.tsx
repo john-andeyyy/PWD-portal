@@ -1,31 +1,73 @@
 'use client';
 
-import { ThemeProvider } from './theme-provider';
-import { Navbar } from '@/components/Navbar';
 import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { Navbar } from '@/components/Navbar';
+import { ThemeProvider } from './theme-provider';
+
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
 
 export function LayoutClient({ children }: { children: React.ReactNode }) {
-    const [isAuthenticated, setIsAuthenticated] = useState<boolean | undefined>(undefined);
+    const router = useRouter();
     const pathname = usePathname();
     const isProtectedRoute = pathname?.startsWith('/dashboard') || pathname?.startsWith('/accounts') || pathname?.startsWith('/members');
 
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean | undefined>(undefined);
+    const [hasPortalAccess, setHasPortalAccess] = useState<boolean | undefined>(undefined);
+
     useEffect(() => {
-        const checkAuth = () => {
+        let cancelled = false;
+
+        const verifyAccess = async () => {
             const token = localStorage.getItem('auth_token');
             setIsAuthenticated(!!token);
+
+            if (!isProtectedRoute) {
+                if (!cancelled) {
+                    setHasPortalAccess(undefined);
+                }
+                return;
+            }
+
+            if (!token) {
+                if (!cancelled) {
+                    setHasPortalAccess(false);
+                }
+                router.replace('/login');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${apiBaseUrl}/auth/me`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+
+                if (!response.ok) {
+                    throw new Error('Unable to verify access');
+                }
+
+                if (!cancelled) {
+                    setHasPortalAccess(true);
+                }
+            } catch {
+                localStorage.removeItem('auth_token');
+                if (!cancelled) {
+                    setHasPortalAccess(false);
+                }
+                router.replace('/login');
+            }
         };
-        checkAuth();
-        window.addEventListener('storage', checkAuth);
-        return () => window.removeEventListener('storage', checkAuth);
-    }, []);
 
-    useEffect(() => {
-        const token = localStorage.getItem('auth_token');
-        setIsAuthenticated(!!token);
-    }, [pathname]);
+        verifyAccess();
+        window.addEventListener('storage', verifyAccess);
 
-    if (isProtectedRoute && isAuthenticated === undefined) {
+        return () => {
+            cancelled = true;
+            window.removeEventListener('storage', verifyAccess);
+        };
+    }, [isProtectedRoute, pathname, router]);
+
+    if (isProtectedRoute && hasPortalAccess !== true) {
         return (
             <ThemeProvider>
                 <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
@@ -39,7 +81,7 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
 
     return (
         <ThemeProvider>
-            <div className="flex flex-col min-h-screen">
+            <div className="flex min-h-screen flex-col">
                 <Navbar isAuthenticated={isAuthenticated ?? false} />
                 <div className="flex-1">{children}</div>
             </div>

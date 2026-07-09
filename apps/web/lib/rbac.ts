@@ -1,16 +1,23 @@
-export const APP_PERMISSIONS = [
-  "members.create",
-  "members.view",
-  "members.update",
-  "members.delete",
-  "accounts.manage",
-] as const;
-
-export type AppPermission = (typeof APP_PERMISSIONS)[number];
+export interface PermissionCatalogItem {
+  key: string;
+  displayName: string;
+}
 
 export const hasPermission = (
   permissions: string[] | undefined,
-  permission: AppPermission,
+  permission: string,
 ): boolean => {
   return Array.isArray(permissions) && permissions.includes(permission);
+};
+
+export const fetchPermissionCatalog = async (
+  apiBaseUrl: string,
+): Promise<PermissionCatalogItem[]> => {
+  const response = await fetch(`${apiBaseUrl}/auth/permissions`);
+
+  if (!response.ok) {
+    throw new Error("Unable to load permission catalog");
+  }
+
+  return response.json();
 };

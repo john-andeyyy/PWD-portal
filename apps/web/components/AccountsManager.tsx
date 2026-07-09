@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { cn } from '@pwd/ui';
-import { APP_PERMISSIONS, AppPermission, hasPermission } from '@/lib/rbac';
+import { fetchPermissionCatalog, hasPermission, PermissionCatalogItem } from '@/lib/rbac';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
 
@@ -11,7 +11,8 @@ type Tab = 'president' | 'role';
 interface MeResponse {
     userId: number;
     email: string;
-    role: string;
+    roleId?: number | null;
+    roleName?: string | null;
     permissions: string[];
 }
 
@@ -62,25 +63,18 @@ export function AccountsManager({ token }: { token: string }) {
     const [presidents, setPresidents] = useState<PresidentItem[]>([]);
     const [members, setMembers] = useState<MemberOption[]>([]);
     const [roles, setRoles] = useState<Role[]>([]);
+    const [permissionCatalog, setPermissionCatalog] = useState<PermissionCatalogItem[]>([]);
     const [presidentPage, setPresidentPage] = useState(1);
     const [rolePage, setRolePage] = useState(1);
     const [presidentPager, setPresidentPager] = useState<Pager>({ data: [], total: 0, page: 1, limit: 5 });
     const [rolePager, setRolePager] = useState<Pager>({ data: [], total: 0, page: 1, limit: 5 });
     const [presidentForm, setPresidentForm] = useState({ name: '', email: '', password: '', roleId: '', memberId: '', isEnabled: true });
-    const [roleForm, setRoleForm] = useState<{ name: string; permissions: AppPermission[] }>({
+    const [roleForm, setRoleForm] = useState<{ name: string; permissions: string[] }>({
         name: '',
-        permissions: ['members.view'],
+        permissions: [],
     });
 
     const canManageRoles = hasPermission(user?.permissions, 'accounts.manage');
-
-    const permissionLabels: Record<AppPermission, string> = {
-        'members.create': 'Create members',
-        'members.view': 'View members',
-        'members.update': 'Update members',
-        'members.delete': 'Delete members',
-        'accounts.manage': 'Manage accounts and roles',
-    };
 
     const fetchMe = async () => {
         const response = await fetch(`${apiBaseUrl}/auth/me`, {
@@ -141,6 +135,26 @@ export function AccountsManager({ token }: { token: string }) {
         setRolePager(data);
     };
 
+    const fetchPermissions = async () => {
+        try {
+            const catalog = await fetchPermissionCatalog(apiBaseUrl);
+            setPermissionCatalog(catalog);
+
+            setRoleForm((current) => {
+                if (current.permissions.length > 0 || catalog.length === 0) {
+                    return current;
+                }
+
+                return {
+                    ...current,
+                    permissions: [catalog[0].key],
+                };
+            });
+        } catch {
+            setStatus('Unable to load permission catalog.');
+        }
+    };
+
     useEffect(() => {
         if (!token) {
             return;
@@ -149,6 +163,7 @@ export function AccountsManager({ token }: { token: string }) {
         fetchPresidents(presidentPage);
         fetchRoles(rolePage);
         fetchMembers();
+        fetchPermissions();
     }, [token, presidentPage, rolePage]);
 
     const handleCreatePresident = async (event: FormEvent<HTMLFormElement>) => {
@@ -200,7 +215,10 @@ export function AccountsManager({ token }: { token: string }) {
         }
 
         setStatus('Role created successfully.');
-        setRoleForm({ name: '', permissions: ['members.view'] });
+        setRoleForm({
+            name: '',
+            permissions: permissionCatalog[0] ? [permissionCatalog[0].key] : [],
+        });
         fetchRoles(1);
     };
 
@@ -238,7 +256,7 @@ export function AccountsManager({ token }: { token: string }) {
         fetchPresidents(presidentPage);
     };
 
-    const handleToggleRolePermission = async (role: Role, permission: AppPermission) => {
+    const handleToggleRolePermission = async (role: Role, permission: string) => {
         const nextPermissions = role.permissions.includes(permission)
             ? role.permissions.filter((item) => item !== permission)
             : [...role.permissions, permission];
@@ -522,25 +540,25 @@ export function AccountsManager({ token }: { token: string }) {
                             <input
                                 value={roleForm.name}
                                 onChange={(event) => setRoleForm({ ...roleForm, name: event.target.value })}
-                                placeholder="Role name"
+                                placeholder="Role key"
                                 className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                                 required
                             />
                             <div className="grid gap-3 sm:grid-cols-2">
-                                {APP_PERMISSIONS.map((permission) => (
-                                    <label key={permission} className="inline-flex items-center gap-3 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                                {permissionCatalog.map((permission) => (
+                                    <label key={permission.key} className="inline-flex items-center gap-3 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
                                         <input
                                             type="checkbox"
-                                            checked={roleForm.permissions.includes(permission)}
+                                            checked={roleForm.permissions.includes(permission.key)}
                                             onChange={(event) => {
                                                 const nextPermissions = event.target.checked
-                                                    ? [...roleForm.permissions, permission]
-                                                    : roleForm.permissions.filter((item) => item !== permission);
-                                                setRoleForm({ ...roleForm, permissions: Array.from(new Set(nextPermissions)) as AppPermission[] });
+                                                    ? [...roleForm.permissions, permission.key]
+                                                    : roleForm.permissions.filter((item) => item !== permission.key);
+                                                setRoleForm({ ...roleForm, permissions: Array.from(new Set(nextPermissions)) });
                                             }}
                                             className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
                                         />
-                                        {permissionLabels[permission]}
+                                        {permission.displayName}
                                     </label>
                                 ))}
                             </div>
@@ -566,28 +584,30 @@ export function AccountsManager({ token }: { token: string }) {
                                 <thead className="bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300">
                                     <tr>
                                         <th className="px-6 py-3">Role</th>
-                                        {APP_PERMISSIONS.map((permission) => (
-                                            <th key={permission} className="px-6 py-3">{permission}</th>
+                                        {permissionCatalog.map((permission) => (
+                                            <th key={permission.key} className="px-6 py-3">{permission.displayName}</th>
                                         ))}
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {roles.map((role) => (
                                         <tr key={role.id} className="border-t border-slate-200 dark:border-slate-700">
-                                            <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">{role.name}</td>
-                                            {APP_PERMISSIONS.map((permission) => (
-                                                <td key={permission} className="px-6 py-4">
+                                            <td className="px-6 py-4">
+                                                <div className="font-semibold text-slate-900 dark:text-white">{role.name}</div>
+                                            </td>
+                                            {permissionCatalog.map((permission) => (
+                                                <td key={permission.key} className="px-6 py-4">
                                                     <button
                                                         type="button"
-                                                        onClick={() => handleToggleRolePermission(role, permission)}
+                                                        onClick={() => handleToggleRolePermission(role, permission.key)}
                                                         className={cn(
                                                             'rounded-full px-3 py-1 text-xs font-semibold transition',
-                                                            role.permissions.includes(permission)
+                                                            role.permissions.includes(permission.key)
                                                                 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200'
                                                                 : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200',
                                                         )}
                                                     >
-                                                        {role.permissions.includes(permission) ? 'On' : 'Off'}
+                                                        {role.permissions.includes(permission.key) ? 'On' : 'Off'}
                                                     </button>
                                                 </td>
                                             ))}
@@ -623,3 +643,4 @@ export function AccountsManager({ token }: { token: string }) {
         </div>
     );
 }
+
