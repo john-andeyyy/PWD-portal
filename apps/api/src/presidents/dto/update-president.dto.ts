@@ -23,6 +23,10 @@ export class UpdatePresidentDto {
   roleId?: number | null;
 
   @IsOptional()
+  @IsInt()
+  memberId?: number | null;
+
+  @IsOptional()
   @IsBoolean()
   isEnabled?: boolean;
 }

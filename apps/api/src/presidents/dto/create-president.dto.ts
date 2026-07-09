@@ -27,4 +27,8 @@ export class CreatePresidentDto {
   @IsOptional()
   @IsBoolean()
   isEnabled?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  memberId?: number;
 }

@@ -13,7 +13,7 @@ export class PresidentsService {
       this.prisma.president.findMany({
         skip: (page - 1) * limit,
         take: limit,
-        include: { role: true },
+        include: { role: true, member: true },
         orderBy: { createdAt: "desc" },
       }),
       this.prisma.president.count(),
@@ -31,8 +31,9 @@ export class PresidentsService {
         password: hashedPassword,
         isEnabled: data.isEnabled ?? true,
         role: data.roleId ? { connect: { id: data.roleId } } : undefined,
+        member: data.memberId ? { connect: { id: data.memberId } } : undefined,
       },
-      include: { role: true },
+      include: { role: true, member: true },
     });
   }
 
@@ -53,8 +54,13 @@ export class PresidentsService {
           : data.roleId === null
             ? { disconnect: true }
             : undefined,
+        member: data.memberId
+          ? { connect: { id: data.memberId } }
+          : data.memberId === null
+            ? { disconnect: true }
+            : undefined,
       },
-      include: { role: true },
+      include: { role: true, member: true },
     });
   }
 }

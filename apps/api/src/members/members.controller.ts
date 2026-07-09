@@ -47,7 +47,7 @@ export class MembersController {
   @Permissions("members.view")
   async findAll(@Request() req: any) {
     try {
-      const result = await this.membersService.findAll(req.user.userId);
+      const result = await this.membersService.findAll(req.user);
       this.logger.log(`Successfully fetched members for user ${req.user.userId}`);
       return result;
     } catch (error) {
@@ -64,7 +64,7 @@ export class MembersController {
   async findOne(@Request() req: any, @Param("id") id: string) {
     try {
       const memberId = Number(id);
-      const result = await this.membersService.findOne(req.user.userId, memberId);
+      const result = await this.membersService.findOne(req.user, memberId);
       this.logger.log(
         `Successfully fetched member ${memberId} for user ${req.user.userId}`,
       );
@@ -88,7 +88,7 @@ export class MembersController {
     try {
       const memberId = Number(id);
       const result = await this.membersService.update(
-        req.user.userId,
+        req.user,
         memberId,
         updateMemberDto,
       );
@@ -110,7 +110,7 @@ export class MembersController {
   async remove(@Request() req: any, @Param("id") id: string) {
     try {
       const memberId = Number(id);
-      const result = await this.membersService.remove(req.user.userId, memberId);
+      const result = await this.membersService.remove(req.user, memberId);
       this.logger.log(
         `Successfully deleted member ${memberId} for user ${req.user.userId}`,
       );

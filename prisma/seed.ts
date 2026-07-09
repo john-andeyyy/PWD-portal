@@ -15,6 +15,44 @@ async function main() {
     },
   });
 
+  const member = await prisma.member.upsert({
+    where: { pwdId: "PWD-0001" },
+    update: {
+      fname: "PWD",
+      lname: "President",
+      mname: null,
+      bday: new Date("1990-01-01"),
+      disability: "HEARING",
+      phoneNumber: "09000000000",
+      address: "PWD Office",
+      barangay: "POBLACION",
+      isBedridden: false,
+      dateIssued: new Date("2024-01-01"),
+      gender: "Male",
+      presidentId: president.id,
+    },
+    create: {
+      presidentId: president.id,
+      fname: "PWD",
+      lname: "President",
+      mname: null,
+      bday: new Date("1990-01-01"),
+      disability: "HEARING",
+      phoneNumber: "09000000000",
+      address: "PWD Office",
+      barangay: "POBLACION",
+      isBedridden: false,
+      pwdId: "PWD-0001",
+      dateIssued: new Date("2024-01-01"),
+      gender: "Male",
+    },
+  });
+
+  await prisma.president.update({
+    where: { id: president.id },
+    data: { member: { connect: { id: member.id } } } as any,
+  });
+
   console.log("President ready:", president.email);
 }
 

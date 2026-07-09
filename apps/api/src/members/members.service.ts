@@ -3,6 +3,14 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CreateMemberDto } from "./dto/create-member.dto";
 import { UpdateMemberDto } from "./dto/update-member.dto";
 
+type RequestUser = {
+  userId: number;
+  permissions?: string[];
+};
+
+const canManageAccounts = (user: RequestUser) =>
+  Array.isArray(user.permissions) && user.permissions.includes("accounts.manage");
+
 @Injectable()
 export class MembersService {
   constructor(private readonly prisma: PrismaService) {}
@@ -22,22 +30,28 @@ export class MembersService {
     });
   }
 
-  async findAll(presidentId: number) {
-    return this.prisma.member.findMany({ where: { presidentId } });
+  async findAll(user: RequestUser) {
+    if (canManageAccounts(user)) {
+      return this.prisma.member.findMany({
+        orderBy: { joinedAt: "desc" },
+      });
+    }
+
+    return this.prisma.member.findMany({ where: { presidentId: user.userId } });
   }
 
-  async findOne(presidentId: number, id: number) {
+  async findOne(user: RequestUser, id: number) {
     const member = await this.prisma.member.findUnique({
       where: { id },
     });
-    if (!member || member.presidentId !== presidentId) {
+    if (!member || (!canManageAccounts(user) && member.presidentId !== user.userId)) {
       throw new NotFoundException("Member not found");
     }
     return member;
   }
 
-  async update(presidentId: number, id: number, data: UpdateMemberDto) {
-    await this.findOne(presidentId, id);
+  async update(user: RequestUser, id: number, data: UpdateMemberDto) {
+    await this.findOne(user, id);
     const payload: Record<string, unknown> = { ...data };
 
     if (data.bday) {
@@ -51,8 +65,8 @@ export class MembersService {
     return this.prisma.member.update({ where: { id }, data: payload });
   }
 
-  async remove(presidentId: number, id: number) {
-    await this.findOne(presidentId, id);
+  async remove(user: RequestUser, id: number) {
+    await this.findOne(user, id);
     return this.prisma.member.delete({ where: { id } });
   }
 }

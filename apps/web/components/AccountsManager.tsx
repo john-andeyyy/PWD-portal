@@ -26,11 +26,25 @@ interface PresidentItem {
     name: string;
     email: string;
     isEnabled: boolean;
+    memberId?: number | null;
+    member?: {
+        id: number;
+        fname: string;
+        lname: string;
+        pwdId: string;
+    } | null;
     role?: {
         id: number;
         name: string;
     } | null;
     createdAt: string;
+}
+
+interface MemberOption {
+    id: number;
+    fname: string;
+    lname: string;
+    pwdId: string;
 }
 
 interface Pager {
@@ -46,12 +60,13 @@ export function AccountsManager({ token }: { token: string }) {
     const [status, setStatus] = useState<string | null>(null);
     const [user, setUser] = useState<MeResponse | null>(null);
     const [presidents, setPresidents] = useState<PresidentItem[]>([]);
+    const [members, setMembers] = useState<MemberOption[]>([]);
     const [roles, setRoles] = useState<Role[]>([]);
     const [presidentPage, setPresidentPage] = useState(1);
     const [rolePage, setRolePage] = useState(1);
     const [presidentPager, setPresidentPager] = useState<Pager>({ data: [], total: 0, page: 1, limit: 5 });
     const [rolePager, setRolePager] = useState<Pager>({ data: [], total: 0, page: 1, limit: 5 });
-    const [presidentForm, setPresidentForm] = useState({ name: '', email: '', password: '', roleId: '', isEnabled: true });
+    const [presidentForm, setPresidentForm] = useState({ name: '', email: '', password: '', roleId: '', memberId: '', isEnabled: true });
     const [roleForm, setRoleForm] = useState<{ name: string; permissions: AppPermission[] }>({
         name: '',
         permissions: ['members.view'],
@@ -95,6 +110,22 @@ export function AccountsManager({ token }: { token: string }) {
         setPresidentPager(data);
     };
 
+    const fetchMembers = async () => {
+        const response = await fetch(`${apiBaseUrl}/members`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        if (!response.ok) {
+            setStatus('Unable to load members.');
+            return;
+        }
+
+        const data = await response.json();
+        setMembers(data || []);
+    };
+
     const fetchRoles = async (page = 1) => {
         const response = await fetch(`${apiBaseUrl}/roles?page=${page}&limit=5`, {
             headers: {
@@ -117,6 +148,7 @@ export function AccountsManager({ token }: { token: string }) {
         fetchMe();
         fetchPresidents(presidentPage);
         fetchRoles(rolePage);
+        fetchMembers();
     }, [token, presidentPage, rolePage]);
 
     const handleCreatePresident = async (event: FormEvent<HTMLFormElement>) => {
@@ -127,6 +159,7 @@ export function AccountsManager({ token }: { token: string }) {
             email: presidentForm.email,
             password: presidentForm.password,
             roleId: presidentForm.roleId ? Number(presidentForm.roleId) : undefined,
+            memberId: presidentForm.memberId ? Number(presidentForm.memberId) : undefined,
             isEnabled: presidentForm.isEnabled,
         };
 
@@ -145,7 +178,7 @@ export function AccountsManager({ token }: { token: string }) {
         }
 
         setStatus('President account created.');
-        setPresidentForm({ name: '', email: '', password: '', roleId: '', isEnabled: true });
+        setPresidentForm({ name: '', email: '', password: '', roleId: '', memberId: '', isEnabled: true });
         fetchPresidents(1);
     };
 
@@ -285,7 +318,7 @@ export function AccountsManager({ token }: { token: string }) {
                         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
                             <div>
                                 <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Create president account</h2>
-                                <p className="text-sm text-slate-600 dark:text-slate-400">Fill in the details below to add a new president account.</p>
+                                <p className="text-sm text-slate-600 dark:text-slate-400">Pick an existing member profile, then add the president account for the same person.</p>
                             </div>
                             <button
                                 type="button"
@@ -320,6 +353,23 @@ export function AccountsManager({ token }: { token: string }) {
                                 required
                             />
                             <div className="grid gap-4 lg:grid-cols-2">
+                                <select
+                                    value={presidentForm.memberId}
+                                    onChange={(event) => setPresidentForm({ ...presidentForm, memberId: event.target.value })}
+                                    className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                                    required
+                                >
+                                    <option value="">Choose member profile</option>
+                                    {members.map((member) => {
+                                        const linked = presidents.some((president) => president.memberId === member.id);
+
+                                        return (
+                                            <option key={member.id} value={member.id} disabled={linked}>
+                                                {[member.fname, member.lname].filter(Boolean).join(' ')} {linked ? '(linked)' : ''}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
                                 <select
                                     value={presidentForm.roleId}
                                     onChange={(event) => setPresidentForm({ ...presidentForm, roleId: event.target.value })}
@@ -391,6 +441,7 @@ export function AccountsManager({ token }: { token: string }) {
                                 <thead className="bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300">
                                     <tr>
                                         <th className="px-6 py-3">Name</th>
+                                        <th className="px-6 py-3">Member</th>
                                         <th className="px-6 py-3">Email</th>
                                         <th className="px-6 py-3">Role</th>
                                         <th className="px-6 py-3">Status</th>
@@ -401,6 +452,9 @@ export function AccountsManager({ token }: { token: string }) {
                                     {presidents.map((president) => (
                                         <tr key={president.id} className="border-t border-slate-200 dark:border-slate-700">
                                             <td className="px-6 py-4">{president.name}</td>
+                                            <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
+                                                {president.member ? [president.member.fname, president.member.lname].filter(Boolean).join(' ') : 'Not linked'}
+                                            </td>
                                             <td className="px-6 py-4">{president.email}</td>
                                             <td className="px-6 py-4">
                                                 <select
