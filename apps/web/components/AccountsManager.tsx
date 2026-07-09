@@ -2,34 +2,23 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { cn } from '@pwd/ui';
+import { APP_PERMISSIONS, AppPermission, hasPermission } from '@/lib/rbac';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
 
 type Tab = 'president' | 'role';
 
-interface Permissions {
-    canCreateMembers: boolean;
-    canViewMembers: boolean;
-    canUpdateMembers: boolean;
-    canDeleteMembers: boolean;
-    canManageRoles: boolean;
-}
-
 interface MeResponse {
     userId: number;
     email: string;
     role: string;
-    permissions: Permissions;
+    permissions: string[];
 }
 
 interface Role {
     id: number;
     name: string;
-    canCreateMembers: boolean;
-    canViewMembers: boolean;
-    canUpdateMembers: boolean;
-    canDeleteMembers: boolean;
-    canManageRoles: boolean;
+    permissions: string[];
 }
 
 interface PresidentItem {
@@ -63,9 +52,20 @@ export function AccountsManager({ token }: { token: string }) {
     const [presidentPager, setPresidentPager] = useState<Pager>({ data: [], total: 0, page: 1, limit: 5 });
     const [rolePager, setRolePager] = useState<Pager>({ data: [], total: 0, page: 1, limit: 5 });
     const [presidentForm, setPresidentForm] = useState({ name: '', email: '', password: '', roleId: '', isEnabled: true });
-    const [roleForm, setRoleForm] = useState({ name: '', canCreateMembers: false, canViewMembers: true, canUpdateMembers: false, canDeleteMembers: false, canManageRoles: false });
+    const [roleForm, setRoleForm] = useState<{ name: string; permissions: AppPermission[] }>({
+        name: '',
+        permissions: ['members.view'],
+    });
 
-    const canManageRoles = user?.permissions.canManageRoles ?? false;
+    const canManageRoles = hasPermission(user?.permissions, 'accounts.manage');
+
+    const permissionLabels: Record<AppPermission, string> = {
+        'members.create': 'Create members',
+        'members.view': 'View members',
+        'members.update': 'Update members',
+        'members.delete': 'Delete members',
+        'accounts.manage': 'Manage accounts and roles',
+    };
 
     const fetchMe = async () => {
         const response = await fetch(`${apiBaseUrl}/auth/me`, {
@@ -167,7 +167,7 @@ export function AccountsManager({ token }: { token: string }) {
         }
 
         setStatus('Role created successfully.');
-        setRoleForm({ name: '', canCreateMembers: false, canViewMembers: true, canUpdateMembers: false, canDeleteMembers: false, canManageRoles: false });
+        setRoleForm({ name: '', permissions: ['members.view'] });
         fetchRoles(1);
     };
 
@@ -205,14 +205,18 @@ export function AccountsManager({ token }: { token: string }) {
         fetchPresidents(presidentPage);
     };
 
-    const handleToggleRolePermission = async (role: Role, permission: keyof Permissions) => {
+    const handleToggleRolePermission = async (role: Role, permission: AppPermission) => {
+        const nextPermissions = role.permissions.includes(permission)
+            ? role.permissions.filter((item) => item !== permission)
+            : [...role.permissions, permission];
+
         const response = await fetch(`${apiBaseUrl}/roles/${role.id}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify({ [permission]: !role[permission] }),
+            body: JSON.stringify({ permissions: nextPermissions }),
         });
 
         if (!response.ok) {
@@ -469,51 +473,22 @@ export function AccountsManager({ token }: { token: string }) {
                                 required
                             />
                             <div className="grid gap-3 sm:grid-cols-2">
-                                <label className="inline-flex items-center gap-3 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-                                    <input
-                                        type="checkbox"
-                                        checked={roleForm.canCreateMembers}
-                                        onChange={(event) => setRoleForm({ ...roleForm, canCreateMembers: event.target.checked })}
-                                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                                    />
-                                    Create members
-                                </label>
-                                <label className="inline-flex items-center gap-3 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-                                    <input
-                                        type="checkbox"
-                                        checked={roleForm.canViewMembers}
-                                        onChange={(event) => setRoleForm({ ...roleForm, canViewMembers: event.target.checked })}
-                                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                                    />
-                                    View members
-                                </label>
-                                <label className="inline-flex items-center gap-3 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-                                    <input
-                                        type="checkbox"
-                                        checked={roleForm.canUpdateMembers}
-                                        onChange={(event) => setRoleForm({ ...roleForm, canUpdateMembers: event.target.checked })}
-                                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                                    />
-                                    Update members
-                                </label>
-                                <label className="inline-flex items-center gap-3 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-                                    <input
-                                        type="checkbox"
-                                        checked={roleForm.canDeleteMembers}
-                                        onChange={(event) => setRoleForm({ ...roleForm, canDeleteMembers: event.target.checked })}
-                                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                                    />
-                                    Delete members
-                                </label>
-                                <label className="inline-flex items-center gap-3 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-                                    <input
-                                        type="checkbox"
-                                        checked={roleForm.canManageRoles}
-                                        onChange={(event) => setRoleForm({ ...roleForm, canManageRoles: event.target.checked })}
-                                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                                    />
-                                    Manage roles
-                                </label>
+                                {APP_PERMISSIONS.map((permission) => (
+                                    <label key={permission} className="inline-flex items-center gap-3 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                                        <input
+                                            type="checkbox"
+                                            checked={roleForm.permissions.includes(permission)}
+                                            onChange={(event) => {
+                                                const nextPermissions = event.target.checked
+                                                    ? [...roleForm.permissions, permission]
+                                                    : roleForm.permissions.filter((item) => item !== permission);
+                                                setRoleForm({ ...roleForm, permissions: Array.from(new Set(nextPermissions)) as AppPermission[] });
+                                            }}
+                                            className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                        />
+                                        {permissionLabels[permission]}
+                                    </label>
+                                ))}
                             </div>
                             <button
                                 type="submit"
@@ -537,30 +512,28 @@ export function AccountsManager({ token }: { token: string }) {
                                 <thead className="bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300">
                                     <tr>
                                         <th className="px-6 py-3">Role</th>
-                                        <th className="px-6 py-3">Create</th>
-                                        <th className="px-6 py-3">View</th>
-                                        <th className="px-6 py-3">Update</th>
-                                        <th className="px-6 py-3">Delete</th>
-                                        <th className="px-6 py-3">Manage roles</th>
+                                        {APP_PERMISSIONS.map((permission) => (
+                                            <th key={permission} className="px-6 py-3">{permission}</th>
+                                        ))}
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {roles.map((role) => (
                                         <tr key={role.id} className="border-t border-slate-200 dark:border-slate-700">
                                             <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">{role.name}</td>
-                                            {(['canCreateMembers', 'canViewMembers', 'canUpdateMembers', 'canDeleteMembers', 'canManageRoles'] as Array<keyof Permissions>).map((permission) => (
+                                            {APP_PERMISSIONS.map((permission) => (
                                                 <td key={permission} className="px-6 py-4">
                                                     <button
                                                         type="button"
                                                         onClick={() => handleToggleRolePermission(role, permission)}
                                                         className={cn(
                                                             'rounded-full px-3 py-1 text-xs font-semibold transition',
-                                                            role[permission]
+                                                            role.permissions.includes(permission)
                                                                 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200'
                                                                 : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200',
                                                         )}
                                                     >
-                                                        {role[permission] ? 'On' : 'Off'}
+                                                        {role.permissions.includes(permission) ? 'On' : 'Off'}
                                                     </button>
                                                 </td>
                                             ))}

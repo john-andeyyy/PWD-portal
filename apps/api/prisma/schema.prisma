@@ -9,15 +9,11 @@ datasource db {
 }
 
 model Role {
-  id               Int       @id @default(autoincrement())
-  name             String    @unique
-  canCreateMembers Boolean   @default(false)
-  canViewMembers   Boolean   @default(true)
-  canUpdateMembers Boolean   @default(false)
-  canDeleteMembers Boolean   @default(false)
-  canManageRoles   Boolean   @default(false)
-  createdAt        DateTime  @default(now())
-  presidents       President[]
+  id          Int         @id @default(autoincrement())
+  name        String      @unique
+  permissions String[]    @default([])
+  createdAt   DateTime    @default(now())
+  presidents  President[]
 }
 
 model President {

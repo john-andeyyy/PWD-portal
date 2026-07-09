@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@pwd/ui';
+import { hasPermission } from '@/lib/rbac';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
 
@@ -26,6 +27,13 @@ interface MembersManagerProps {
     token: string;
 }
 
+interface MeResponse {
+    userId: number;
+    email: string;
+    role: string;
+    permissions: string[];
+}
+
 export function MembersManager({ token }: MembersManagerProps) {
     const [members, setMembers] = useState<Member[]>([]);
     const [status, setStatus] = useState<string | null>(null);
@@ -44,6 +52,7 @@ export function MembersManager({ token }: MembersManagerProps) {
         gender: ''
     });
     const [otherDisability, setOtherDisability] = useState('');
+    const [user, setUser] = useState<MeResponse | null>(null);
 
     const DISABILITIES = [
         'CANCER (RA 11215)',
@@ -118,11 +127,43 @@ export function MembersManager({ token }: MembersManagerProps) {
         }
     };
 
+    const fetchMe = async () => {
+        const response = await fetch(`${apiBaseUrl}/auth/me`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!response.ok) {
+            setStatus('Unable to load account permissions.');
+            return;
+        }
+        setUser(await response.json());
+    };
+
     useEffect(() => {
         if (token) {
+            fetchMe();
             fetchMembers();
         }
     }, [token]);
+
+    const canViewMembers = hasPermission(user?.permissions, 'members.view');
+    const canCreateMembers = hasPermission(user?.permissions, 'members.create');
+
+    if (!user) {
+        return (
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center dark:border-slate-700 dark:bg-slate-900">
+                <p className="text-slate-600 dark:text-slate-400">Loading permissions...</p>
+            </div>
+        );
+    }
+
+    if (!canViewMembers) {
+        return (
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center dark:border-slate-700 dark:bg-slate-900">
+                <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Access restricted</h2>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">You do not have permission to view members on this page.</p>
+            </div>
+        );
+    }
 
     const createMember = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -174,35 +215,37 @@ export function MembersManager({ token }: MembersManagerProps) {
                     <span className="rounded-full bg-slate-200 px-3 py-1 text-sm font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                         {members.length} members
                     </span>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setForm({
-                                fname: '',
-                                lname: '',
-                                mname: '',
-                                bday: '',
-                                disability: '',
-                                barangay: '',
-                                phoneNumber: '',
-                                address: '',
-                                isBedridden: false,
-                                pwdId: '',
-                                dateIssued: '',
-                                gender: ''
-                            });
-                            setStatus(null);
-                            setStep(1);
-                            setIsModalOpen(true);
-                        }}
-                        className={cn(
-                            'rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition',
-                            'hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-500/40',
-                            'dark:bg-sky-600 dark:hover:bg-sky-500'
-                        )}
-                    >
-                        Add Member
-                    </button>
+                    {canCreateMembers ? (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setForm({
+                                    fname: '',
+                                    lname: '',
+                                    mname: '',
+                                    bday: '',
+                                    disability: '',
+                                    barangay: '',
+                                    phoneNumber: '',
+                                    address: '',
+                                    isBedridden: false,
+                                    pwdId: '',
+                                    dateIssued: '',
+                                    gender: ''
+                                });
+                                setStatus(null);
+                                setStep(1);
+                                setIsModalOpen(true);
+                            }}
+                            className={cn(
+                                'rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition',
+                                'hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-500/40',
+                                'dark:bg-sky-600 dark:hover:bg-sky-500'
+                            )}
+                        >
+                            Add Member
+                        </button>
+                    ) : null}
                 </div>
             </div>
 

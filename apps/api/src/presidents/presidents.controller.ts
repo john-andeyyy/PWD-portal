@@ -21,7 +21,7 @@ export class PresidentsController {
   constructor(private readonly presidentsService: PresidentsService) {}
 
   @Get()
-  @Permissions("canManageRoles")
+  @Permissions("accounts.manage")
   findAll(@Query("page") page = "1", @Query("limit") limit = "10") {
     const pageNumber = Number(page) || 1;
     const pageSize = Number(limit) || 10;
@@ -29,13 +29,13 @@ export class PresidentsController {
   }
 
   @Post()
-  @Permissions("canManageRoles")
+  @Permissions("accounts.manage")
   create(@Body() createPresidentDto: CreatePresidentDto) {
     return this.presidentsService.create(createPresidentDto);
   }
 
   @Put(":id")
-  @Permissions("canManageRoles")
+  @Permissions("accounts.manage")
   update(
     @Param("id") id: string,
     @Body() updatePresidentDto: UpdatePresidentDto,

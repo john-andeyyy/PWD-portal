@@ -22,25 +22,25 @@ export class MembersController {
   constructor(private readonly membersService: MembersService) {}
 
   @Post()
-  @Permissions("canCreateMembers")
+  @Permissions("members.create")
   create(@Request() req: any, @Body() createMemberDto: CreateMemberDto) {
     return this.membersService.create(req.user.userId, createMemberDto);
   }
 
   @Get()
-  @Permissions("canViewMembers")
+  @Permissions("members.view")
   findAll(@Request() req: any) {
     return this.membersService.findAll(req.user.userId);
   }
 
   @Get(":id")
-  @Permissions("canViewMembers")
+  @Permissions("members.view")
   findOne(@Request() req: any, @Param("id") id: string) {
     return this.membersService.findOne(req.user.userId, Number(id));
   }
 
   @Put(":id")
-  @Permissions("canUpdateMembers")
+  @Permissions("members.update")
   update(
     @Request() req: any,
     @Param("id") id: string,
@@ -54,7 +54,7 @@ export class MembersController {
   }
 
   @Delete(":id")
-  @Permissions("canDeleteMembers")
+  @Permissions("members.delete")
   remove(@Request() req: any, @Param("id") id: string) {
     return this.membersService.remove(req.user.userId, Number(id));
   }

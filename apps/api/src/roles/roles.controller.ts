@@ -21,7 +21,7 @@ export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
 
   @Get()
-  @Permissions("canManageRoles")
+  @Permissions("accounts.manage")
   findAll(@Query("page") page = "1", @Query("limit") limit = "10") {
     const pageNumber = Number(page) || 1;
     const pageSize = Number(limit) || 10;
@@ -29,13 +29,13 @@ export class RolesController {
   }
 
   @Post()
-  @Permissions("canManageRoles")
+  @Permissions("accounts.manage")
   create(@Body() createRoleDto: CreateRoleDto) {
     return this.rolesService.create(createRoleDto);
   }
 
   @Put(":id")
-  @Permissions("canManageRoles")
+  @Permissions("accounts.manage")
   update(@Param("id") id: string, @Body() updateRoleDto: UpdateRoleDto) {
     return this.rolesService.update(Number(id), updateRoleDto);
   }

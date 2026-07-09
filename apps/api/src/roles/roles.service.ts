@@ -24,11 +24,7 @@ export class RolesService {
     return this.prisma.role.create({
       data: {
         name: data.name,
-        canCreateMembers: data.canCreateMembers ?? false,
-        canViewMembers: data.canViewMembers ?? true,
-        canUpdateMembers: data.canUpdateMembers ?? false,
-        canDeleteMembers: data.canDeleteMembers ?? false,
-        canManageRoles: data.canManageRoles ?? false,
+        permissions: data.permissions ?? [],
       },
     });
   }
@@ -43,11 +39,7 @@ export class RolesService {
       where: { id },
       data: {
         name: data.name,
-        canCreateMembers: data.canCreateMembers,
-        canViewMembers: data.canViewMembers,
-        canUpdateMembers: data.canUpdateMembers,
-        canDeleteMembers: data.canDeleteMembers,
-        canManageRoles: data.canManageRoles,
+        permissions: data.permissions,
       },
     });
   }
