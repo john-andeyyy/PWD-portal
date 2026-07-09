@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Logger,
   Param,
   Post,
   Put,
@@ -19,43 +20,107 @@ import { UpdateMemberDto } from "./dto/update-member.dto";
 @Controller("members")
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class MembersController {
+  private readonly logger = new Logger(MembersController.name);
+
   constructor(private readonly membersService: MembersService) {}
 
   @Post()
   @Permissions("members.create")
-  create(@Request() req: any, @Body() createMemberDto: CreateMemberDto) {
-    return this.membersService.create(req.user.userId, createMemberDto);
+  async create(@Request() req: any, @Body() createMemberDto: CreateMemberDto) {
+    try {
+      const result = await this.membersService.create(
+        req.user.userId,
+        createMemberDto,
+      );
+      this.logger.log(`Successfully created member for user ${req.user.userId}`);
+      return result;
+    } catch (error) {
+      this.logger.error(
+        `Issue while creating member for user ${req.user.userId}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
   }
 
   @Get()
   @Permissions("members.view")
-  findAll(@Request() req: any) {
-    return this.membersService.findAll(req.user.userId);
+  async findAll(@Request() req: any) {
+    try {
+      const result = await this.membersService.findAll(req.user.userId);
+      this.logger.log(`Successfully fetched members for user ${req.user.userId}`);
+      return result;
+    } catch (error) {
+      this.logger.error(
+        `Issue while fetching members for user ${req.user.userId}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
   }
 
   @Get(":id")
   @Permissions("members.view")
-  findOne(@Request() req: any, @Param("id") id: string) {
-    return this.membersService.findOne(req.user.userId, Number(id));
+  async findOne(@Request() req: any, @Param("id") id: string) {
+    try {
+      const memberId = Number(id);
+      const result = await this.membersService.findOne(req.user.userId, memberId);
+      this.logger.log(
+        `Successfully fetched member ${memberId} for user ${req.user.userId}`,
+      );
+      return result;
+    } catch (error) {
+      this.logger.error(
+        `Issue while fetching member ${id} for user ${req.user.userId}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
   }
 
   @Put(":id")
   @Permissions("members.update")
-  update(
+  async update(
     @Request() req: any,
     @Param("id") id: string,
     @Body() updateMemberDto: UpdateMemberDto,
   ) {
-    return this.membersService.update(
-      req.user.userId,
-      Number(id),
-      updateMemberDto,
-    );
+    try {
+      const memberId = Number(id);
+      const result = await this.membersService.update(
+        req.user.userId,
+        memberId,
+        updateMemberDto,
+      );
+      this.logger.log(
+        `Successfully updated member ${memberId} for user ${req.user.userId}`,
+      );
+      return result;
+    } catch (error) {
+      this.logger.error(
+        `Issue while updating member ${id} for user ${req.user.userId}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
   }
 
   @Delete(":id")
   @Permissions("members.delete")
-  remove(@Request() req: any, @Param("id") id: string) {
-    return this.membersService.remove(req.user.userId, Number(id));
+  async remove(@Request() req: any, @Param("id") id: string) {
+    try {
+      const memberId = Number(id);
+      const result = await this.membersService.remove(req.user.userId, memberId);
+      this.logger.log(
+        `Successfully deleted member ${memberId} for user ${req.user.userId}`,
+      );
+      return result;
+    } catch (error) {
+      this.logger.error(
+        `Issue while deleting member ${id} for user ${req.user.userId}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
   }
 }

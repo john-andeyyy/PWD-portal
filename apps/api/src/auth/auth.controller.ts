@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Logger,
   Post,
   Request,
   UseGuards,
@@ -12,23 +13,45 @@ import { JwtAuthGuard } from "./jwt-auth.guard";
 
 @Controller("auth")
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(private readonly authService: AuthService) {}
 
   @Post("login")
   async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto.email, loginDto.password);
+    try {
+      const result = await this.authService.login(loginDto.email, loginDto.password);
+      this.logger.log(`Successfully logged in ${loginDto.email}`);
+      return result;
+    } catch (error) {
+      this.logger.error(
+        `Issue while logging in ${loginDto.email}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
   }
 
   @UseGuards(JwtAuthGuard)
   @Get("me")
   async me(@Request() req: any) {
-    return {
-      userId: req.user.userId,
-      email: req.user.email,
-      role: req.user.role,
-      roleId: req.user.roleId,
-      isEnabled: req.user.isEnabled,
-      permissions: req.user.permissions,
-    };
+    try {
+      const result = {
+        userId: req.user.userId,
+        email: req.user.email,
+        role: req.user.role,
+        roleId: req.user.roleId,
+        isEnabled: req.user.isEnabled,
+        permissions: req.user.permissions,
+      };
+      this.logger.log(`Successfully fetched auth profile for user ${req.user.userId}`);
+      return result;
+    } catch (error) {
+      this.logger.error(
+        `Issue while fetching auth profile for user ${req.user?.userId ?? "unknown"}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
   }
 }
