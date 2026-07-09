@@ -46,8 +46,9 @@ export class CreateMemberDto {
   @MaxLength(60)
   pwdId: string;
 
+  @IsOptional()
   @IsDateString()
-  dateIssued: string;
+  dateIssued?: string;
 
   @IsString()
   @MaxLength(30)

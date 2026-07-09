@@ -42,7 +42,7 @@ model Member {
   barangay    String
   isBedridden Boolean
   pwdId       String    @unique
-  dateIssued  DateTime
+  dateIssued  DateTime?
   gender      String
   joinedAt    DateTime  @default(now())
   president   President @relation("PresidentMembers", fields: [presidentId], references: [id])

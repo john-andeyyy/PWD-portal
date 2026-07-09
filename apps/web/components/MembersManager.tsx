@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@pwd/ui';
 import { hasPermission } from '@/lib/rbac';
+import { parseMemberImportText, type MemberImportRow } from '@/lib/member-import';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
 
@@ -37,6 +38,11 @@ interface MeResponse {
 export function MembersManager({ token }: MembersManagerProps) {
     const [members, setMembers] = useState<Member[]>([]);
     const [status, setStatus] = useState<string | null>(null);
+    const [importRows, setImportRows] = useState<MemberImportRow[]>([]);
+    const [importMessage, setImportMessage] = useState<string | null>(null);
+    const [importErrors, setImportErrors] = useState<string[]>([]);
+    const [importWarnings, setImportWarnings] = useState<string[]>([]);
+    const [isImporting, setIsImporting] = useState(false);
     const [form, setForm] = useState({
         fname: '',
         lname: '',
@@ -53,6 +59,7 @@ export function MembersManager({ token }: MembersManagerProps) {
     });
     const [otherDisability, setOtherDisability] = useState('');
     const [user, setUser] = useState<MeResponse | null>(null);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     const DISABILITIES = [
         'CANCER (RA 11215)',
@@ -101,6 +108,13 @@ export function MembersManager({ token }: MembersManagerProps) {
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 10;
 
+    const resetImportState = () => {
+        setImportRows([]);
+        setImportMessage(null);
+        setImportErrors([]);
+        setImportWarnings([]);
+    };
+
     const isStep1Valid = () => {
         return (
             form.fname.trim() !== '' &&
@@ -144,6 +158,90 @@ export function MembersManager({ token }: MembersManagerProps) {
             fetchMembers();
         }
     }, [token]);
+
+    const createMemberFromPayload = async (payload: MemberImportRow['payload']) => {
+        if (!payload) {
+            throw new Error('Missing import payload.');
+        }
+
+        return fetch(`${apiBaseUrl}/members`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify(payload)
+        });
+    };
+
+    const handleImportRows = async (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+
+        if (!file) {
+            return;
+        }
+
+        setStatus(`Parsing ${file.name}...`);
+        setImportMessage(null);
+        setImportErrors([]);
+        setImportWarnings([]);
+
+        try {
+            const text = await file.text();
+            const parsed = parseMemberImportText(text);
+            const validRows = parsed.rows.filter((row) => row.payload && row.errors.length === 0);
+            const skippedRows = parsed.rows.filter((row) => !row.payload || row.errors.length > 0);
+            const warnings = parsed.rows.flatMap((row) => row.warnings.map((warning) => `Row ${row.rowNumber}: ${warning}`));
+
+            if (parsed.rows.length === 0) {
+                setStatus('No rows were found in the uploaded file.');
+                resetImportState();
+                return;
+            }
+
+            if (validRows.length === 0) {
+                setStatus('No valid member rows were found in the uploaded file.');
+                setImportRows(parsed.rows);
+                setImportMessage(`Parsed ${parsed.rows.length} row(s) from ${file.name}, but none were ready to insert.`);
+                setImportErrors(skippedRows.slice(0, 5).flatMap((row) => [`Row ${row.rowNumber}: ${[...row.errors, ...row.warnings].join(' ')}`]));
+                setImportWarnings(warnings.slice(0, 5));
+                return;
+            }
+
+            setIsImporting(true);
+
+            let insertedCount = 0;
+            const failedRows: string[] = [];
+
+            for (const row of validRows) {
+                const response = await createMemberFromPayload(row.payload);
+                if (response.ok) {
+                    insertedCount += 1;
+                    continue;
+                }
+
+                const errorText = await response.text();
+                failedRows.push(`Row ${row.rowNumber}: ${errorText || response.statusText || 'failed to insert'}`);
+            }
+
+            const skippedCount = skippedRows.length;
+            const summary = `Imported ${insertedCount} row(s) from ${file.name}. ${skippedCount} skipped.`;
+            setStatus(summary);
+            setImportMessage(summary);
+            setImportRows(parsed.rows);
+            setImportErrors(failedRows.slice(0, 5));
+            setImportWarnings(warnings.slice(0, 5));
+            await fetchMembers();
+        } catch (error) {
+            setStatus('Failed to import the uploaded file.');
+            setImportMessage('Failed to import the uploaded file.');
+            setImportErrors([error instanceof Error ? error.message : 'Unknown import error']);
+            setImportWarnings([]);
+        } finally {
+            setIsImporting(false);
+        }
+    };
 
     const canViewMembers = hasPermission(user?.permissions, 'members.view');
     const canCreateMembers = hasPermission(user?.permissions, 'members.create');
@@ -208,13 +306,28 @@ export function MembersManager({ token }: MembersManagerProps) {
                 <div>
                     <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Member Management</h2>
                     <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                        Browse the current roster and add new members from the modal.
+                        Browse the current roster, add new members, or import rows from a CSV or tab-separated file.
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
                     <span className="rounded-full bg-slate-200 px-3 py-1 text-sm font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                         {members.length} members
                     </span>
+                    {canCreateMembers ? (
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isImporting}
+                            className={cn(
+                                'rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition',
+                                'hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/40',
+                                'dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800',
+                                isImporting && 'cursor-not-allowed opacity-60'
+                            )}
+                        >
+                            {isImporting ? 'Importing...' : 'Import CSV'}
+                        </button>
+                    ) : null}
                     {canCreateMembers ? (
                         <button
                             type="button"
@@ -249,6 +362,39 @@ export function MembersManager({ token }: MembersManagerProps) {
                 </div>
             </div>
 
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values"
+                className="hidden"
+                onChange={handleImportRows}
+            />
+
+            {importMessage ? (
+                <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-100">
+                    <p className="font-medium">{importMessage}</p>
+                    {importErrors.length > 0 ? (
+                        <ul className="mt-2 space-y-1 text-xs text-sky-800 dark:text-sky-200">
+                            {importErrors.map((error) => (
+                                <li key={error}>{error}</li>
+                            ))}
+                        </ul>
+                    ) : null}
+                    {importWarnings.length > 0 ? (
+                        <ul className="mt-2 space-y-1 text-xs text-sky-800 dark:text-sky-200">
+                            {importWarnings.map((warning) => (
+                                <li key={warning}>{warning}</li>
+                            ))}
+                        </ul>
+                    ) : null}
+                    {importRows.length > 0 ? (
+                        <p className="mt-2 text-xs text-sky-800/80 dark:text-sky-200/80">
+                            Parsed {importRows.length} row(s). Blank bedridden values were saved as false.
+                        </p>
+                    ) : null}
+                </div>
+            ) : null}
+
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
                 <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-700">
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Members Table</h3>
@@ -279,7 +425,7 @@ export function MembersManager({ token }: MembersManagerProps) {
                         <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
                             {members.length === 0 ? (
                                 <tr>
-                                    <td className="px-5 py-10 text-sm text-slate-600 dark:text-slate-400" colSpan={4}>
+                                    <td className="px-5 py-10 text-sm text-slate-600 dark:text-slate-400" colSpan={5}>
                                         No members yet. Use the Add Member button to create the first record.
                                     </td>
                                 </tr>

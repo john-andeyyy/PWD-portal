@@ -9,18 +9,25 @@ type RequestUser = {
 };
 
 const canManageAccounts = (user: RequestUser) =>
-  Array.isArray(user.permissions) && user.permissions.includes("accounts.manage");
+  Array.isArray(user.permissions) &&
+  user.permissions.includes("accounts.manage");
 
 @Injectable()
 export class MembersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(presidentId: number, data: CreateMemberDto) {
-    const payload = {
-      ...data,
-      bday: new Date(data.bday),
-      dateIssued: new Date(data.dateIssued),
-    };
+    const { dateIssued, ...rest } = data;
+    const payload = dateIssued
+      ? {
+          ...rest,
+          bday: new Date(data.bday),
+          dateIssued: new Date(dateIssued),
+        }
+      : {
+          ...rest,
+          bday: new Date(data.bday),
+        };
 
     return this.prisma.member.create({
       data: {
@@ -44,7 +51,10 @@ export class MembersService {
     const member = await this.prisma.member.findUnique({
       where: { id },
     });
-    if (!member || (!canManageAccounts(user) && member.presidentId !== user.userId)) {
+    if (
+      !member ||
+      (!canManageAccounts(user) && member.presidentId !== user.userId)
+    ) {
       throw new NotFoundException("Member not found");
     }
     return member;
