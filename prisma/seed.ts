@@ -8,7 +8,6 @@ async function main() {
   const adminRole = await prisma.role.upsert({
     where: { name: "admin" },
     update: {
-      displayName: "Administrator",
       permissions: [
         "members.create",
         "members.view",
@@ -19,7 +18,6 @@ async function main() {
     },
     create: {
       name: "admin",
-      displayName: "Administrator",
       permissions: [
         "members.create",
         "members.view",
@@ -80,10 +78,11 @@ async function main() {
 
   await prisma.president.update({
     where: { id: president.id },
-    data: { member: { connect: { id: member.id } } } as any,
+    data: { memberId: member.id },
   });
 
-  console.log("President ready:", president.email);
+  console.log("President ready:", president.email, "ID:", president.id);
+  console.log("Member linked:", member.pwdId, "ID:", member.id);
 }
 
 main()
