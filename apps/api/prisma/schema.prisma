@@ -14,39 +14,45 @@ model Role {
   permissions String[]    @default([])
   createdAt   DateTime    @default(now())
   presidents  President[]
+
+  @@map("roles")
 }
 
 model President {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String
-  password  String
-  isEnabled Boolean  @default(true)
-  isSuperAdmin Boolean @default(false)
-  roleId    String?
-  role      Role?    @relation(fields: [roleId], references: [id])
-  memberId  String?  @unique
-  member    Member?  @relation("PresidentProfile", fields: [memberId], references: [id])
-  createdAt DateTime @default(now())
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  password     String
+  isEnabled    Boolean  @default(true)
+  isSuperAdmin Boolean  @default(false)
+  roleId       String?
+  role         Role?    @relation(fields: [roleId], references: [id])
+  memberId     String?  @unique
+  member       Member?  @relation("PresidentProfile", fields: [memberId], references: [id])
+  createdAt    DateTime @default(now())
   addedMembers Member[] @relation("MembersAddedByPresident")
+
+  @@map("presidents")
 }
 
 model Member {
-  id          String    @id @default(uuid())
-  addedById   String    @map("presidentId")
-  fname       String
-  lname       String
-  mname       String?
-  bday        DateTime
-  disability  String
-  phoneNumber String
-  address     String
-  barangay    String
-  isBedridden Boolean
-  pwdId       String    @unique
-  dateIssued  DateTime?
-  gender      String
-  joinedAt    DateTime  @default(now())
-  addedBy     President @relation("MembersAddedByPresident", fields: [addedById], references: [id])
+  id               String     @id @default(uuid())
+  addedById        String     @map("presidentId")
+  fname            String
+  lname            String
+  mname            String?
+  bday             DateTime
+  disability       String
+  phoneNumber      String
+  address          String
+  barangay         String
+  isBedridden      Boolean
+  pwdId            String     @unique
+  dateIssued       DateTime?
+  gender           String
+  joinedAt         DateTime   @default(now())
+  addedBy          President  @relation("MembersAddedByPresident", fields: [addedById], references: [id])
   presidentProfile President? @relation("PresidentProfile")
+
+  @@map("members")
 }
