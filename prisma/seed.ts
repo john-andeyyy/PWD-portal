@@ -57,10 +57,10 @@ async function main() {
       isBedridden: false,
       dateIssued: new Date("2024-01-01"),
       gender: "Male",
-      presidentId: president.id,
+      addedById: president.id,
     },
     create: {
-      presidentId: president.id,
+      addedById: president.id,
       fname: "PWD",
       lname: "President",
       mname: null,

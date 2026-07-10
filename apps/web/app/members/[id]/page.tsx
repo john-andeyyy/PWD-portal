@@ -17,17 +17,38 @@ import {
     Mars,
     Venus,
     UserCircle2,
+    Hash,
+    Bed,
+    Clock,
 } from "lucide-react";
 
 const apiBaseUrl =
     process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001";
+
+type Member = {
+    id: string;
+    addedById: string;
+    fname: string;
+    lname: string;
+    mname?: string | null;
+    bday: string;
+    disability: string;
+    phoneNumber: string;
+    address: string;
+    barangay: string;
+    isBedridden: boolean;
+    pwdId: string;
+    dateIssued?: string | null;
+    gender: string;
+    joinedAt: string;
+};
 
 export default function MemberDetailPage() {
     const params = useParams();
     const router = useRouter();
 
     const [token, setToken] = useState<string | null>(null);
-    const [member, setMember] = useState<any | null>(null);
+    const [member, setMember] = useState<Member | null>(null);
 
     useEffect(() => {
         const t = localStorage.getItem("auth_token");
@@ -83,7 +104,11 @@ export default function MemberDetailPage() {
             return "-";
         }
 
-        return parsedDate.toLocaleDateString();
+        return new Intl.DateTimeFormat("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+        }).format(parsedDate).replace(",", "");
     }
 
     const initials = useMemo(() => {
@@ -155,15 +180,23 @@ export default function MemberDetailPage() {
 
                         {member ? (
                             <div className="mt-8 grid gap-6 lg:grid-cols-2">
+                                <InfoCard
+                                    icon={<User size={22} />}
+                                    title="First Name"
+                                    value={member.fname || "-"}
+                                />
 
                                 <InfoCard
                                     icon={<User size={22} />}
-                                    title="Full Name"
-                                    value={[member.fname, member.mname, member.lname]
-                                        .filter(Boolean)
-                                        .join(" ")}
+                                    title="Middle Name"
+                                    value={member.mname || "-"}
                                 />
 
+                                <InfoCard
+                                    icon={<User size={22} />}
+                                    title="Last Name"
+                                    value={member.lname || "-"}
+                                />
                                 <InfoCard
                                     icon={<Cake size={22} />}
                                     title="Age"
@@ -175,9 +208,14 @@ export default function MemberDetailPage() {
                                     title="Birthday"
                                     value={
                                         member.bday
-                                            ? new Date(member.bday).toLocaleDateString()
+                                            ? formatDateDisplay(member.bday)
                                             : "-"
                                     }
+                                />
+                                <InfoCard
+                                    icon={<BadgeCheck size={22} />}
+                                    title="PWD ID"
+                                    value={member.pwdId || "-"}
                                 />
 
                                 <InfoCard
@@ -185,7 +223,6 @@ export default function MemberDetailPage() {
                                     title="Date Issued"
                                     value={formatDateDisplay(member.dateIssued)}
                                 />
-
                                 <InfoCard
                                     icon={
                                         member.gender === "Female" ? (
@@ -197,7 +234,6 @@ export default function MemberDetailPage() {
                                     title="Gender"
                                     value={member.gender}
                                 />
-
                                 <InfoCard
                                     icon={<Accessibility size={22} />}
                                     title="Disability"
@@ -205,22 +241,40 @@ export default function MemberDetailPage() {
                                 />
 
                                 <InfoCard
+                                    icon={<Bed size={22} />}
+                                    title="Bedridden"
+                                    value={member.isBedridden ? "Yes" : "No"}
+                                />
+
+                                <InfoCard
                                     icon={<MapPin size={22} />}
                                     title="Barangay"
                                     value={member.barangay ?? "-"}
                                 />
-
                                 <InfoCard
                                     icon={<Phone size={22} />}
                                     title="Phone Number"
                                     value={member.phoneNumber || "-"}
                                 />
-
                                 <div className="lg:col-span-2">
                                     <InfoCard
                                         icon={<Home size={22} />}
                                         title="Complete Address"
                                         value={member.address || "-"}
+                                    />
+                                </div>
+
+                                <InfoCard
+                                    icon={<Clock size={22} />}
+                                    title="Joined At"
+                                    value={formatDateDisplay(member.joinedAt)}
+                                />
+
+                                <div className="lg:col-span-2">
+                                    <InfoCard
+                                        icon={<Hash size={22} />}
+                                        title="Added By User ID"
+                                        value={member.addedById || "-"}
                                     />
                                 </div>
                             </div>

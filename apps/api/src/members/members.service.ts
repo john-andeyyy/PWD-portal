@@ -46,7 +46,7 @@ const parseBooleanQuery = (value?: string) => {
 export class MembersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(presidentId: string, data: CreateMemberDto) {
+  async create(addedById: string, data: CreateMemberDto) {
     const { dateIssued, ...rest } = data;
     const payload = dateIssued
       ? {
@@ -62,7 +62,7 @@ export class MembersService {
     return this.prisma.member.create({
       data: {
         ...payload,
-        president: { connect: { id: presidentId as any } },
+        addedBy: { connect: { id: addedById as any } },
       },
     });
   }
@@ -71,7 +71,7 @@ export class MembersService {
     const filters: Prisma.MemberWhereInput[] = [];
 
     if (!canManageAccounts(user)) {
-      filters.push({ presidentId: user.userId as any });
+      filters.push({ addedById: user.userId as any });
     }
 
     const search = query.search?.trim();
@@ -150,13 +150,46 @@ export class MembersService {
     };
   }
 
+  async getFilterOptions(user: RequestUser) {
+    const where: Prisma.MemberWhereInput | undefined = canManageAccounts(user)
+      ? undefined
+      : { addedById: user.userId as any };
+
+    const [barangays, disabilities] = await Promise.all([
+      this.prisma.member.findMany({
+        where,
+        distinct: ["barangay"],
+        select: { barangay: true },
+        orderBy: { barangay: "asc" },
+      }),
+      this.prisma.member.findMany({
+        where,
+        distinct: ["disability"],
+        select: { disability: true },
+        orderBy: { disability: "asc" },
+      }),
+    ]);
+
+    const normalizeOptions = (values: string[]) =>
+      values
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0);
+
+    return {
+      barangays: normalizeOptions(barangays.map((item) => item.barangay)),
+      disabilities: normalizeOptions(
+        disabilities.map((item) => item.disability),
+      ),
+    };
+  }
+
   async findOne(user: RequestUser, id: string) {
     const member = await this.prisma.member.findUnique({
       where: { id: id as any },
     });
     if (
       !member ||
-      (!canManageAccounts(user) && member.presidentId !== (user.userId as any))
+      (!canManageAccounts(user) && member.addedById !== (user.userId as any))
     ) {
       throw new NotFoundException("Member not found");
     }

@@ -16,7 +16,7 @@ const sidebarItems: SidebarItem[] = [
     { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={18} /> },
     { key: 'members', label: 'Members', href: '/members', icon: <Users size={18} /> },
     { key: 'accounts', label: 'Accounts', href: '/accounts', icon: <BriefcaseBusiness size={18} /> },
-    { key: 'roles', label: 'Roles', href: '/roles', icon: <Shield size={18} /> },
+    // { key: 'roles', label: 'Roles', href: '/roles', icon: <Shield size={18} /> },
     { key: 'profile', label: 'Profile', href: '/profile', icon: <UserCircle2 size={18} /> },
 ];
 

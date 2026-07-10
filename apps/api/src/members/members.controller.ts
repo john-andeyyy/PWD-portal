@@ -93,6 +93,24 @@ export class MembersController {
     }
   }
 
+  @Get("filter-options")
+  @Permissions("members.view")
+  async getFilterOptions(@Request() req: any) {
+    try {
+      const result = await this.membersService.getFilterOptions(req.user);
+      this.logger.log(
+        `Successfully fetched member filter options for user ${req.user.userId}`,
+      );
+      return result;
+    } catch (error) {
+      this.logger.error(
+        "Issue while fetching member filter options",
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
+  }
+
   @Get(":id")
   @Permissions("members.view")
   async findOne(@Request() req: any, @Param("id") id: string) {

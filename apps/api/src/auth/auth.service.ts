@@ -181,7 +181,7 @@ export class AuthService {
 
           const createdMember = await tx.member.create({
             data: {
-              president: { connect: { id: userId as any } },
+              addedBy: { connect: { id: userId as any } },
               fname: dto.fname as string,
               lname: dto.lname as string,
               mname: dto.mname,

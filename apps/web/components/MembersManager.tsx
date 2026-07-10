@@ -64,7 +64,11 @@ const formatDateDisplay = (value?: string | null) => {
         return '-';
     }
 
-    return parsedDate.toLocaleDateString();
+    return new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+    }).format(parsedDate).replace(',', '');
 };
 
 interface MembersManagerProps {
@@ -83,6 +87,11 @@ interface MembersPager {
     total: number;
     page: number;
     limit: number;
+}
+
+interface MemberFilterOptions {
+    barangays: string[];
+    disabilities: string[];
 }
 
 const parseApiError = async (response: Response) => {
@@ -120,6 +129,7 @@ export function MembersManager({ token }: MembersManagerProps) {
     const [isEditingMember, setIsEditingMember] = useState(false);
     const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
     const [pager, setPager] = useState<MembersPager>({ data: [], total: 0, page: 1, limit: 10 });
+    const [memberFilterOptions, setMemberFilterOptions] = useState<MemberFilterOptions>({ barangays: [], disabilities: [] });
 
     const DISABILITIES = [
         'CANCER (RA 11215)',
@@ -250,6 +260,21 @@ export function MembersManager({ token }: MembersManagerProps) {
         );
     };
 
+    const fetchMemberFilterOptions = async () => {
+        const response = await fetch(`${apiBaseUrl}/members/filter-options`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!response.ok) {
+            return;
+        }
+
+        const data = await response.json();
+        setMemberFilterOptions({
+            barangays: Array.isArray(data?.barangays) ? data.barangays : [],
+            disabilities: Array.isArray(data?.disabilities) ? data.disabilities : [],
+        });
+    };
+
     const fetchMe = async () => {
         const response = await fetch(`${apiBaseUrl}/auth/me`, {
             headers: { Authorization: `Bearer ${token}` }
@@ -264,6 +289,7 @@ export function MembersManager({ token }: MembersManagerProps) {
     useEffect(() => {
         if (token) {
             fetchMe();
+            fetchMemberFilterOptions();
         }
     }, [token]);
 
@@ -352,7 +378,7 @@ export function MembersManager({ token }: MembersManagerProps) {
             setImportRows(parsed.rows);
             setImportErrors(failedRows.slice(0, 5));
             setImportWarnings(warnings.slice(0, 5));
-            await fetchMembers();
+            await Promise.all([fetchMembers(), fetchMemberFilterOptions()]);
         } catch (error) {
             setStatus('Failed to import the uploaded file.');
             setImportMessage('Failed to import the uploaded file.');
@@ -439,7 +465,7 @@ export function MembersManager({ token }: MembersManagerProps) {
         if (response.ok) {
             setStatus(isEditingMember ? 'Member updated successfully.' : 'Member created successfully.');
             closeMemberModal();
-            fetchMembers();
+            await Promise.all([fetchMembers(), fetchMemberFilterOptions()]);
             return;
         }
         const errorMessage = await parseApiError(response);
@@ -517,7 +543,7 @@ export function MembersManager({ token }: MembersManagerProps) {
                         )}
                     >
                         <option value="">All barangays</option>
-                        {BARANGAYS.map((barangay) => (
+                        {memberFilterOptions.barangays.map((barangay) => (
                             <option key={barangay} value={barangay}>
                                 {barangay}
                             </option>
@@ -537,7 +563,7 @@ export function MembersManager({ token }: MembersManagerProps) {
                         )}
                     >
                         <option value="">All disabilities</option>
-                        {DISABILITIES.map((disability) => (
+                        {memberFilterOptions.disabilities.map((disability) => (
                             <option key={disability} value={disability}>
                                 {disability}
                             </option>
