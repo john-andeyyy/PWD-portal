@@ -1,4 +1,4 @@
-import {
+﻿import {
   Body,
   Controller,
   Get,
@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { AuthService } from "./auth.service";
+import { ChangePasswordDto } from "./dto/change-password.dto";
 import { LoginDto } from "./dto/login.dto";
 import { UpdateProfileDto } from "./dto/update-profile.dto";
 import { JwtAuthGuard } from "./jwt-auth.guard";
@@ -28,17 +29,11 @@ export class AuthController {
   @Post("login")
   async login(@Body() loginDto: LoginDto) {
     try {
-      const result = await this.authService.login(
-        loginDto.email,
-        loginDto.password,
-      );
+      const result = await this.authService.login(loginDto.email, loginDto.password);
       this.logger.log(`Successfully logged in ${loginDto.email}`);
       return result;
     } catch (error) {
-      this.logger.error(
-        `Issue while logging in ${loginDto.email}`,
-        error instanceof Error ? error.stack : undefined,
-      );
+      this.logger.error(`Issue while logging in ${loginDto.email}`, error instanceof Error ? error.stack : undefined);
       throw error;
     }
   }
@@ -71,15 +66,10 @@ export class AuthController {
         dateIssued: member?.dateIssued?.toISOString() ?? null,
         gender: member?.gender ?? null,
       };
-      this.logger.log(
-        `Successfully fetched auth profile for user ${req.user.userId}`,
-      );
+      this.logger.log(`Successfully fetched auth profile for user ${req.user.userId}`);
       return result;
     } catch (error) {
-      this.logger.error(
-        `Issue while fetching auth profile for user ${req.user?.userId ?? "unknown"}`,
-        error instanceof Error ? error.stack : undefined,
-      );
+      this.logger.error(`Issue while fetching auth profile for user ${req.user?.userId ?? "unknown"}`, error instanceof Error ? error.stack : undefined);
       throw error;
     }
   }
@@ -88,20 +78,19 @@ export class AuthController {
   @Put("profile")
   async updateProfile(@Request() req: any, @Body() dto: UpdateProfileDto) {
     try {
-      const result = await this.authService.updateOwnProfile(
-        req.user.userId,
-        dto,
-      );
-      this.logger.log(
-        `Successfully updated auth profile for user ${req.user.userId}`,
-      );
+      const result = await this.authService.updateOwnProfile(req.user.userId, dto);
+      this.logger.log(`Successfully updated auth profile for user ${req.user.userId}`);
       return result;
     } catch (error) {
-      this.logger.error(
-        `Issue while updating auth profile for user ${req.user?.userId ?? "unknown"}`,
-        error instanceof Error ? error.stack : undefined,
-      );
+      this.logger.error(`Issue while updating auth profile for user ${req.user?.userId ?? "unknown"}`, error instanceof Error ? error.stack : undefined);
       throw error;
     }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put("password")
+  async changePassword(@Request() req: any, @Body() dto: ChangePasswordDto) {
+    await this.authService.changeOwnPassword(req.user.userId, dto);
+    return { message: "Password changed successfully." };
   }
 }

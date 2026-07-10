@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateMemberDto } from "./dto/create-member.dto";
@@ -26,53 +26,51 @@ type MemberListQuery = {
   sortOrder?: "asc" | "desc";
 };
 
+type MemberStatsQuery = {
+  barangay?: string;
+};
+
 const parseBooleanQuery = (value?: string) => {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  if (value === "true" || value === "1") {
-    return true;
-  }
-
-  if (value === "false" || value === "0") {
-    return false;
-  }
-
+  if (value === undefined) return undefined;
+  if (value === "true" || value === "1") return true;
+  if (value === "false" || value === "0") return false;
   return undefined;
+};
+
+const assertNotFutureDate = (value: string | undefined, label: string) => {
+  if (!value) return;
+  const input = new Date(value);
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  if (Number.isNaN(input.getTime()) || input.getTime() > today.getTime()) {
+    throw new BadRequestException(`${label} must not be a future date.`);
+  }
 };
 
 @Injectable()
 export class MembersService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private validateMemberDates(data: CreateMemberDto | UpdateMemberDto) {
+    assertNotFutureDate(data.bday, "Birthday");
+    assertNotFutureDate(data.dateIssued, "Date issued");
+  }
+
   async create(addedById: string, data: CreateMemberDto) {
+    this.validateMemberDates(data);
     const { dateIssued, ...rest } = data;
     const payload = dateIssued
-      ? {
-          ...rest,
-          bday: new Date(data.bday),
-          dateIssued: new Date(dateIssued),
-        }
-      : {
-          ...rest,
-          bday: new Date(data.bday),
-        };
+      ? { ...rest, bday: new Date(data.bday), dateIssued: new Date(dateIssued) }
+      : { ...rest, bday: new Date(data.bday) };
 
     return this.prisma.member.create({
-      data: {
-        ...payload,
-        addedBy: { connect: { id: addedById as any } },
-      },
+      data: { ...payload, addedBy: { connect: { id: addedById as any } } },
     });
   }
 
   async findAll(user: RequestUser, query: MemberListQuery = {}) {
     const filters: Prisma.MemberWhereInput[] = [];
-
-    if (!canManageAccounts(user)) {
-      filters.push({ addedById: user.userId as any });
-    }
+    if (!canManageAccounts(user)) filters.push({ addedById: user.userId as any });
 
     const search = query.search?.trim();
     if (search) {
@@ -87,29 +85,16 @@ export class MembersService {
       });
     }
 
-    if (query.barangay?.trim()) {
-      filters.push({
-        barangay: { equals: query.barangay.trim(), mode: "insensitive" },
-      });
-    }
-
-    if (query.disability?.trim()) {
-      filters.push({
-        disability: { equals: query.disability.trim(), mode: "insensitive" },
-      });
-    }
+    if (query.barangay?.trim()) filters.push({ barangay: { equals: query.barangay.trim(), mode: "insensitive" } });
+    if (query.disability?.trim()) filters.push({ disability: { equals: query.disability.trim(), mode: "insensitive" } });
 
     const bedridden = parseBooleanQuery(query.isBedridden);
-    if (bedridden !== undefined) {
-      filters.push({ isBedridden: bedridden });
-    }
+    if (bedridden !== undefined) filters.push({ isBedridden: bedridden });
 
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 10));
     const sortBy = query.sortBy ?? "lname";
-    const sortOrder: Prisma.SortOrder =
-      query.sortOrder === "desc" ? "desc" : "asc";
-
+    const sortOrder: Prisma.SortOrder = query.sortOrder === "desc" ? "desc" : "asc";
     const where = filters.length > 0 ? { AND: filters } : undefined;
     const orderBy: Prisma.MemberOrderByWithRelationInput[] =
       sortBy === "fname"
@@ -119,78 +104,44 @@ export class MembersService {
           : [{ lname: sortOrder }, { fname: sortOrder }];
 
     const [data, total] = await Promise.all([
-      this.prisma.member.findMany({
-        where,
-        orderBy,
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
+      this.prisma.member.findMany({ where, orderBy, skip: (page - 1) * limit, take: limit }),
       this.prisma.member.count({ where }),
     ]);
 
     return { data, total, page, limit };
   }
 
-  async getGlobalStats() {
-    const [total, grouped] = await Promise.all([
-      this.prisma.member.count(),
-      this.prisma.member.groupBy({
-        by: ["disability"],
-        _count: { _all: true },
-        orderBy: { _count: { disability: "desc" } },
-      }),
-    ]);
+  async getStats(user: RequestUser, query: MemberStatsQuery = {}) {
+    const filters: Prisma.MemberWhereInput[] = [];
+    if (!canManageAccounts(user)) filters.push({ addedById: user.userId as any });
+    if (query.barangay?.trim()) filters.push({ barangay: { equals: query.barangay.trim(), mode: "insensitive" } });
 
+    const where = filters.length > 0 ? { AND: filters } : undefined;
+    const [total, groupedByDisability, groupedByBarangay] = await Promise.all([
+      this.prisma.member.count({ where }),
+      this.prisma.member.groupBy({ by: ["disability"], where, _count: { _all: true }, orderBy: { _count: { disability: "desc" } } }),
+      this.prisma.member.groupBy({ by: ["barangay"], where, _count: { _all: true }, orderBy: { _count: { barangay: "desc" } } }),
+    ]);
     return {
       total,
-      byDisability: grouped.map((item) => ({
-        disability: item.disability,
-        count: item._count._all,
-      })),
+      byDisability: groupedByDisability.map((item) => ({ disability: item.disability, count: item._count._all })),
+      byBarangay: groupedByBarangay.map((item) => ({ barangay: item.barangay, count: item._count._all })),
     };
   }
 
   async getFilterOptions(user: RequestUser) {
-    const where: Prisma.MemberWhereInput | undefined = canManageAccounts(user)
-      ? undefined
-      : { addedById: user.userId as any };
-
+    const where: Prisma.MemberWhereInput | undefined = canManageAccounts(user) ? undefined : { addedById: user.userId as any };
     const [barangays, disabilities] = await Promise.all([
-      this.prisma.member.findMany({
-        where,
-        distinct: ["barangay"],
-        select: { barangay: true },
-        orderBy: { barangay: "asc" },
-      }),
-      this.prisma.member.findMany({
-        where,
-        distinct: ["disability"],
-        select: { disability: true },
-        orderBy: { disability: "asc" },
-      }),
+      this.prisma.member.findMany({ where, distinct: ["barangay"], select: { barangay: true }, orderBy: { barangay: "asc" } }),
+      this.prisma.member.findMany({ where, distinct: ["disability"], select: { disability: true }, orderBy: { disability: "asc" } }),
     ]);
-
-    const normalizeOptions = (values: string[]) =>
-      values
-        .map((value) => value.trim())
-        .filter((value) => value.length > 0);
-
-    return {
-      barangays: normalizeOptions(barangays.map((item) => item.barangay)),
-      disabilities: normalizeOptions(
-        disabilities.map((item) => item.disability),
-      ),
-    };
+    const normalizeOptions = (values: string[]) => values.map((value) => value.trim()).filter((value) => value.length > 0);
+    return { barangays: normalizeOptions(barangays.map((item) => item.barangay)), disabilities: normalizeOptions(disabilities.map((item) => item.disability)) };
   }
 
   async findOne(user: RequestUser, id: string) {
-    const member = await this.prisma.member.findUnique({
-      where: { id: id as any },
-    });
-    if (
-      !member ||
-      (!canManageAccounts(user) && member.addedById !== (user.userId as any))
-    ) {
+    const member = await this.prisma.member.findUnique({ where: { id: id as any } });
+    if (!member || (!canManageAccounts(user) && member.addedById !== (user.userId as any))) {
       throw new NotFoundException("Member not found");
     }
     return member;
@@ -198,20 +149,11 @@ export class MembersService {
 
   async update(user: RequestUser, id: string, data: UpdateMemberDto) {
     await this.findOne(user, id);
+    this.validateMemberDates(data);
     const payload: Record<string, unknown> = { ...data };
-
-    if (data.bday) {
-      payload.bday = new Date(data.bday);
-    }
-
-    if (data.dateIssued) {
-      payload.dateIssued = new Date(data.dateIssued);
-    }
-
-    return this.prisma.member.update({
-      where: { id: id as any },
-      data: payload,
-    });
+    if (data.bday) payload.bday = new Date(data.bday);
+    if (data.dateIssued) payload.dateIssued = new Date(data.dateIssued);
+    return this.prisma.member.update({ where: { id: id as any }, data: payload });
   }
 
   async remove(user: RequestUser, id: string) {
@@ -219,3 +161,4 @@ export class MembersService {
     return this.prisma.member.delete({ where: { id: id as any } });
   }
 }
+

@@ -1,4 +1,4 @@
-import {
+﻿import {
   BadRequestException,
   Injectable,
   NotFoundException,
@@ -8,11 +8,22 @@ import { JwtService } from "@nestjs/jwt";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import * as bcrypt from "bcryptjs";
+import { ChangePasswordDto } from "./dto/change-password.dto";
 import { UpdateProfileDto } from "./dto/update-profile.dto";
 
 type PresidentWithRelations = Prisma.PresidentGetPayload<{
   include: { role: true; member: true };
 }>;
+
+const assertNotFutureDate = (value: string | undefined, label: string) => {
+  if (!value) return;
+  const input = new Date(value);
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  if (Number.isNaN(input.getTime()) || input.getTime() > today.getTime()) {
+    throw new BadRequestException(`${label} must not be a future date.`);
+  }
+};
 
 @Injectable()
 export class AuthService {
@@ -22,34 +33,18 @@ export class AuthService {
   ) {}
 
   async validatePresident(email: string, password: string) {
-    const president = await this.prisma.president.findUnique({
-      where: { email },
-      include: { role: true },
-    });
-    if (!president) {
-      throw new UnauthorizedException("Account not found");
-    }
-
-    if (!president.isEnabled) {
-      throw new UnauthorizedException("Account disabled ");
-    }
+    const president = await this.prisma.president.findUnique({ where: { email }, include: { role: true } });
+    if (!president) throw new UnauthorizedException("Invalid credentials.");
+    if (!president.isEnabled) throw new UnauthorizedException("Account disabled.");
 
     const isValid = await bcrypt.compare(password, president.password);
-    if (!isValid) {
-      throw new UnauthorizedException("Invalid credentials.");
-    }
-
+    if (!isValid) throw new UnauthorizedException("Invalid credentials.");
     return president;
   }
 
   async login(email: string, password: string) {
     const president = await this.validatePresident(email, password);
-    return {
-      accessToken: this.jwtService.sign({
-        sub: president.id,
-        email: president.email,
-      }),
-    };
+    return { accessToken: this.jwtService.sign({ sub: president.id, email: president.email }) };
   }
 
   private buildProfileResponse(president: PresidentWithRelations) {
@@ -62,9 +57,7 @@ export class AuthService {
       roleName: presidentRecord.role?.name ?? null,
       isEnabled: presidentRecord.isEnabled,
       isSuperAdmin: presidentRecord.isSuperAdmin,
-      permissions: Array.isArray(presidentRecord.role?.permissions)
-        ? presidentRecord.role.permissions
-        : [],
+      permissions: Array.isArray(presidentRecord.role?.permissions) ? presidentRecord.role.permissions : [],
       memberId: presidentRecord.member?.id ?? null,
       fname: presidentRecord.member?.fname ?? null,
       lname: presidentRecord.member?.lname ?? null,
@@ -81,37 +74,40 @@ export class AuthService {
     };
   }
 
+  async changeOwnPassword(userId: string, dto: ChangePasswordDto) {
+    const existing = await this.prisma.president.findUnique({ where: { id: userId as any } });
+    if (!existing) throw new NotFoundException("Account not found");
+
+    const currentMatches = await bcrypt.compare(dto.currentPassword, existing.password);
+    if (!currentMatches) throw new UnauthorizedException("Current password is incorrect.");
+
+    const samePassword = await bcrypt.compare(dto.newPassword, existing.password);
+    if (samePassword) throw new BadRequestException("New password must be different from the current password.");
+
+    const password = await bcrypt.hash(dto.newPassword, 10);
+    await this.prisma.president.update({ where: { id: userId as any }, data: { password } });
+  }
+
   async updateOwnProfile(userId: string, dto: UpdateProfileDto) {
+    assertNotFutureDate(dto.bday, "Birthday");
+    assertNotFutureDate(dto.dateIssued, "Date issued");
+
     const existing = (await this.prisma.president.findUnique({
       where: { id: userId as any },
       include: { role: true, member: true },
     })) as PresidentWithRelations | null;
 
-    if (!existing) {
-      throw new NotFoundException("Account not found");
-    }
+    if (!existing) throw new NotFoundException("Account not found");
 
     if (dto.email && dto.email !== existing.email) {
-      const duplicate = await this.prisma.president.findUnique({
-        where: { email: dto.email },
-      });
-
-      if (duplicate && duplicate.id !== (userId as any)) {
-        throw new BadRequestException("Email is already in use");
-      }
+      const duplicate = await this.prisma.president.findUnique({ where: { email: dto.email } });
+      if (duplicate && duplicate.id !== (userId as any)) throw new BadRequestException("Email is already in use");
     }
 
     if (dto.pwdId && dto.pwdId !== existing.member?.pwdId) {
-      const duplicatePwdId = await this.prisma.member.findUnique({
-        where: { pwdId: dto.pwdId },
-      });
-
-      if (duplicatePwdId && duplicatePwdId.id !== existing.member?.id) {
-        throw new BadRequestException("PWD ID is already in use");
-      }
+      const duplicatePwdId = await this.prisma.member.findUnique({ where: { pwdId: dto.pwdId } });
+      if (duplicatePwdId && duplicatePwdId.id !== existing.member?.id) throw new BadRequestException("PWD ID is already in use");
     }
-
-    const password = dto.password ? await bcrypt.hash(dto.password, 10) : undefined;
 
     const hasMemberProfileUpdates = [
       dto.fname,
@@ -129,11 +125,7 @@ export class AuthService {
     ].some((field) => field !== undefined);
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const presidentUpdateData: Prisma.PresidentUpdateInput = {
-        name: dto.name,
-        email: dto.email,
-        password,
-      };
+      const presidentUpdateData: Prisma.PresidentUpdateInput = { name: dto.name, email: dto.email };
 
       if (hasMemberProfileUpdates) {
         if (existing.memberId && existing.member) {
@@ -152,10 +144,7 @@ export class AuthService {
             gender: dto.gender,
           };
 
-            await tx.member.update({
-              where: { id: existing.memberId as any },
-            data: memberUpdateData,
-          });
+          await tx.member.update({ where: { id: existing.memberId as any }, data: memberUpdateData });
         } else {
           const requiredForCreate = {
             fname: dto.fname,
@@ -168,16 +157,8 @@ export class AuthService {
             pwdId: dto.pwdId,
             gender: dto.gender,
           };
-
-          const missingRequired = Object.entries(requiredForCreate)
-            .filter(([, value]) => !value)
-            .map(([key]) => key);
-
-          if (missingRequired.length > 0) {
-            throw new BadRequestException(
-              `To create a profile member link, provide: ${missingRequired.join(", ")}`,
-            );
-          }
+          const missingRequired = Object.entries(requiredForCreate).filter(([, value]) => !value).map(([key]) => key);
+          if (missingRequired.length > 0) throw new BadRequestException(`To create a profile member link, provide: ${missingRequired.join(", ")}`);
 
           const createdMember = await tx.member.create({
             data: {
@@ -201,11 +182,7 @@ export class AuthService {
         }
       }
 
-      return tx.president.update({
-        where: { id: userId as any },
-        data: presidentUpdateData,
-        include: { role: true, member: true },
-      });
+      return tx.president.update({ where: { id: userId as any }, data: presidentUpdateData, include: { role: true, member: true } });
     });
 
     return this.buildProfileResponse(updated);

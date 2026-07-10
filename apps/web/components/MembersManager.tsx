@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@pwd/ui';
 import { hasPermission } from '@/lib/rbac';
 import { parseMemberImportText, type MemberImportRow } from '@/lib/member-import';
+import { focusFirstInvalidField, friendlyError, isFutureDate, isValidPhilippineMobile, MOBILE_HELP, normalizeNumericInput } from '@/lib/validation';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
 
@@ -38,6 +39,8 @@ type MemberFormState = {
     dateIssued: string;
     gender: string;
 };
+
+type MemberFormErrors = Partial<Record<keyof MemberFormState | 'form', string>>;
 
 const EMPTY_MEMBER_FORM: MemberFormState = {
     fname: '',
@@ -118,8 +121,11 @@ export function MembersManager({ token }: MembersManagerProps) {
     const [importErrors, setImportErrors] = useState<string[]>([]);
     const [importWarnings, setImportWarnings] = useState<string[]>([]);
     const [isImporting, setIsImporting] = useState(false);
+    const [isSubmittingMember, setIsSubmittingMember] = useState(false);
+    const [formErrors, setFormErrors] = useState<MemberFormErrors>({});
     const [form, setForm] = useState<MemberFormState>(EMPTY_MEMBER_FORM);
     const [otherDisability, setOtherDisability] = useState('');
+    const [isOtherDisabilitySelected, setIsOtherDisabilitySelected] = useState(false);
     const [user, setUser] = useState<MeResponse | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [memberSearch, setMemberSearch] = useState('');
@@ -177,10 +183,14 @@ export function MembersManager({ token }: MembersManagerProps) {
 
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 10;
+    const isPresetDisability = (disability: string) => DISABILITIES.includes(disability) && disability !== 'Other';
+    const usesOtherDisability = (disability: string) => disability.trim() !== '' && !isPresetDisability(disability);
 
     const resetMemberForm = () => {
         setForm(EMPTY_MEMBER_FORM);
         setOtherDisability('');
+        setIsOtherDisabilitySelected(false);
+        setFormErrors({});
         setIsEditingMember(false);
         setEditingMemberId(null);
     };
@@ -227,12 +237,12 @@ export function MembersManager({ token }: MembersManagerProps) {
             form.gender !== '' &&
             form.address.trim() !== '' &&
             form.barangay.trim() !== '' &&
-            form.phoneNumber.trim() !== ''
+            isValidPhilippineMobile(form.phoneNumber)
         );
     };
 
     const isStep2Valid = () => {
-        return form.disability.trim() !== '' && form.pwdId.trim() !== '' && form.dateIssued !== '';
+        return form.disability.trim() !== '' && form.pwdId.trim() !== '' && form.dateIssued !== '' && !isFutureDate(form.dateIssued);
     };
 
     const fetchMembers = async () => {
@@ -431,7 +441,8 @@ export function MembersManager({ token }: MembersManagerProps) {
             dateIssued: member.dateIssued?.slice(0, 10) ?? '',
             gender: member.gender
         });
-        setOtherDisability(DISABILITIES.includes(member.disability) ? '' : member.disability);
+        setOtherDisability(usesOtherDisability(member.disability) ? member.disability : '');
+        setIsOtherDisabilitySelected(usesOtherDisability(member.disability));
         setIsEditingMember(true);
         setEditingMemberId(member.id);
         setStatus(null);
@@ -445,8 +456,41 @@ export function MembersManager({ token }: MembersManagerProps) {
         resetMemberForm();
     };
 
+    const validateMemberForm = () => {
+        const nextErrors: MemberFormErrors = {};
+        if (!form.fname.trim()) nextErrors.fname = 'First name is required.';
+        if (!form.lname.trim()) nextErrors.lname = 'Last name is required.';
+        if (!form.bday) nextErrors.bday = 'Birthday is required.';
+        else if (isFutureDate(form.bday)) nextErrors.bday = 'Birthday must not be a future date.';
+        if (!form.gender) nextErrors.gender = 'Gender is required.';
+        if (!form.address.trim()) nextErrors.address = 'Address is required.';
+        if (!form.barangay.trim()) nextErrors.barangay = 'Barangay is required.';
+        if (!form.phoneNumber.trim()) nextErrors.phoneNumber = 'Phone number is required.';
+        else if (!isValidPhilippineMobile(form.phoneNumber)) nextErrors.phoneNumber = MOBILE_HELP;
+        if (!form.disability.trim()) nextErrors.disability = 'Disability is required.';
+        if (!form.pwdId.trim()) nextErrors.pwdId = 'PWD ID is required.';
+        if (!form.dateIssued) nextErrors.dateIssued = 'Date issued is required.';
+        else if (isFutureDate(form.dateIssued)) nextErrors.dateIssued = 'Date issued must not be a future date.';
+        return nextErrors;
+    };
+
+    const updateMemberForm = (nextForm: MemberFormState) => {
+        setForm(nextForm);
+        setFormErrors({});
+    };
+
     const submitMember = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+        const nextErrors = validateMemberForm();
+        setFormErrors(nextErrors);
+        if (Object.keys(nextErrors).length > 0) {
+            setStatus('Please fix the highlighted fields.');
+            setStep(nextErrors.fname || nextErrors.lname || nextErrors.bday || nextErrors.gender || nextErrors.address || nextErrors.barangay || nextErrors.phoneNumber ? 1 : 2);
+            focusFirstInvalidField(nextErrors);
+            return;
+        }
+
+        setIsSubmittingMember(true);
         setStatus(isEditingMember ? 'Updating member...' : 'Creating member...');
         const response = await fetch(
             isEditingMember && editingMemberId !== null
@@ -466,12 +510,14 @@ export function MembersManager({ token }: MembersManagerProps) {
             setStatus(isEditingMember ? 'Member updated successfully.' : 'Member created successfully.');
             closeMemberModal();
             await Promise.all([fetchMembers(), fetchMemberFilterOptions()]);
+            setIsSubmittingMember(false);
             return;
         }
-        const errorMessage = await parseApiError(response);
+        const errorMessage = friendlyError(await parseApiError(response));
         setStatus(isEditingMember ? `Failed to update member: ${errorMessage}` : `Failed to create member: ${errorMessage}`);
+        setFormErrors({ form: errorMessage });
+        setIsSubmittingMember(false);
     };
-
     return (
         <div className="space-y-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -754,7 +800,7 @@ export function MembersManager({ token }: MembersManagerProps) {
                                 <h3 id="add-member-title" className="text-xl font-semibold text-slate-900 dark:text-white">
                                     {isEditingMember ? 'Update Member' : 'Add Member'}
                                 </h3>
-                                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Step {step} of 2 — {step === 1 ? 'Personal info' : 'PWD details'}</p>
+                                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Step {step} of 2 - {step === 1 ? 'Personal info' : 'PWD details'}</p>
                             </div>
                             <button
                                 type="button"
@@ -762,7 +808,7 @@ export function MembersManager({ token }: MembersManagerProps) {
                                 className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white"
                                 aria-label="Close modal"
                             >
-                                ✕
+                                x
                             </button>
                         </div>
 
@@ -886,8 +932,11 @@ export function MembersManager({ token }: MembersManagerProps) {
                                             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Phone Number <span className="text-red-500">*</span></span>
                                             <input
                                                 value={form.phoneNumber}
-                                                onChange={(event) => setForm({ ...form, phoneNumber: event.target.value })}
-                                                placeholder="09xxxxxxxxx"
+                                                onChange={(event) => updateMemberForm({ ...form, phoneNumber: normalizeNumericInput(event.target.value) })}
+                                                placeholder="09XXXXXXXXX"
+                                                type="tel"
+                                                inputMode="numeric"
+                                                maxLength={11}
                                                 className={cn(
                                                     'w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-slate-900 placeholder-slate-500 outline-none transition',
                                                     'focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20',
@@ -902,12 +951,14 @@ export function MembersManager({ token }: MembersManagerProps) {
                                         <label className="space-y-2 sm:col-span-2">
                                             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Disability <span className="text-red-500">*</span></span>
                                             <select
-                                                value={DISABILITIES.includes(form.disability) ? form.disability : (otherDisability ? 'Other' : '')}
+                                                value={isPresetDisability(form.disability) ? form.disability : (isOtherDisabilitySelected ? 'Other' : '')}
                                                 onChange={(e) => {
                                                     const val = e.target.value;
                                                     if (val === 'Other') {
-                                                        setForm({ ...form, disability: '' });
+                                                        setIsOtherDisabilitySelected(true);
+                                                        setForm({ ...form, disability: otherDisability });
                                                     } else {
+                                                        setIsOtherDisabilitySelected(false);
                                                         setForm({ ...form, disability: val });
                                                         setOtherDisability('');
                                                     }
@@ -925,9 +976,9 @@ export function MembersManager({ token }: MembersManagerProps) {
                                                 ))}
                                             </select>
 
-                                            {(!DISABILITIES.includes(form.disability)) || (otherDisability) ? (
+                                            {isOtherDisabilitySelected ? (
                                                 <input
-                                                    value={otherDisability || form.disability}
+                                                    value={otherDisability}
                                                     onChange={(e) => {
                                                         setOtherDisability(e.target.value);
                                                         setForm({ ...form, disability: e.target.value });
@@ -1037,14 +1088,14 @@ export function MembersManager({ token }: MembersManagerProps) {
                                     ) : (
                                         <button
                                             type="submit"
-                                            disabled={!isStep2Valid()}
+                                            disabled={!isStep2Valid() || isSubmittingMember}
                                             className={cn(
                                                 'rounded-lg px-5 py-2 text-sm font-semibold text-white transition',
                                                 'bg-sky-500 hover:bg-sky-600 dark:bg-sky-600 dark:hover:bg-sky-500',
-                                                !isStep2Valid() && 'opacity-50 cursor-not-allowed'
+                                                (!isStep2Valid() || isSubmittingMember) && 'opacity-50 cursor-not-allowed'
                                             )}
                                         >
-                                            {isEditingMember ? 'Update Member' : 'Create Member'}
+                                            {isSubmittingMember ? (isEditingMember ? 'Updating member...' : 'Creating member...') : (isEditingMember ? 'Update Member' : 'Create Member')}
                                         </button>
                                     )}
                                 </div>
@@ -1056,3 +1107,7 @@ export function MembersManager({ token }: MembersManagerProps) {
         </div>
     );
 }
+
+
+
+

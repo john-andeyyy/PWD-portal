@@ -1,8 +1,9 @@
-import {
+﻿import {
   IsBoolean,
   IsDateString,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
 } from "class-validator";
 
@@ -33,7 +34,9 @@ export class UpdateMemberDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(40)
+  @Matches(/^09\d{9}$/, {
+    message: "Enter a valid 11-digit mobile number starting with 09.",
+  })
   phoneNumber?: string;
 
   @IsOptional()

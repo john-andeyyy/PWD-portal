@@ -79,10 +79,10 @@ export class MembersController {
 
   @Get("stats")
   @Permissions("members.view")
-  async getStats() {
+  async getStats(@Request() req: any, @Query() query: { barangay?: string }) {
     try {
-      const result = await this.membersService.getGlobalStats();
-      this.logger.log("Successfully fetched member stats");
+      const result = await this.membersService.getStats(req.user, query);
+      this.logger.log(`Successfully fetched member stats for user ${req.user.userId}`);
       return result;
     } catch (error) {
       this.logger.error(
@@ -173,3 +173,5 @@ export class MembersController {
     }
   }
 }
+
+

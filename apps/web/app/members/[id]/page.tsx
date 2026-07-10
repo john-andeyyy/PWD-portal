@@ -1,33 +1,15 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { Sidebar } from "@/components/Sidebar";
-
-import {
-    ArrowLeft,
-    Calendar,
-    Cake,
-    Phone,
-    User,
-    Home,
-    MapPin,
-    BadgeCheck,
-    Accessibility,
-    Mars,
-    Venus,
-    UserCircle2,
-    Hash,
-    Bed,
-    Clock,
-} from "lucide-react";
-
-const apiBaseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001";
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { ArrowLeft, BadgeCheck, Edit, X } from 'lucide-react';
+import { AppShell } from '@/components/AppShell';
+import { Badge, Button, Card, EmptyState, LoadingButton, SelectInput, Skeleton, StatusMessage, TextInput } from '@/components/ui/primitives';
+import { apiBaseUrl, parseApiError } from '@/lib/api';
+import { hasPermission } from '@/lib/rbac';
 
 type Member = {
     id: string;
-    addedById: string;
     fname: string;
     lname: string;
     mname?: string | null;
@@ -43,289 +25,384 @@ type Member = {
     joinedAt: string;
 };
 
-export default function MemberDetailPage() {
-    const params = useParams();
-    const router = useRouter();
+type MeResponse = { permissions: string[]; isSuperAdmin?: boolean };
 
-    const [token, setToken] = useState<string | null>(null);
-    const [member, setMember] = useState<Member | null>(null);
+type MemberFormState = {
+    fname: string;
+    lname: string;
+    mname: string;
+    bday: string;
+    disability: string;
+    phoneNumber: string;
+    address: string;
+    barangay: string;
+    isBedridden: boolean;
+    pwdId: string;
+    dateIssued: string;
+    gender: string;
+};
 
-    useEffect(() => {
-        const t = localStorage.getItem("auth_token");
+const DISABILITIES = [
+    'CANCER (RA 11215)',
+    'DEAF',
+    'DEAF & MUTE',
+    'Down Syndrome',
+    'HEARING',
+    'HEART',
+    'Hyper',
+    'INTELLECTUAL',
+    'LEARNING',
+    'MENTAL',
+    'MULTIPLE',
+    'MULTIPLE DISABILITY',
+    'ORTHOPEDIC',
+    'PHYSICAL',
+    'POLIO',
+    'PSYCHOLOGICAL',
+    'PSYCHOSOCIAL',
+    'RARE DISEASE (RA 10747)',
+    'SPEECH',
+    'SPEECH IMPAIRMENT',
+    'Other',
+];
 
-        if (!t) {
-            router.push("/");
-            return;
-        }
+const isPresetDisability = (disability: string) => DISABILITIES.includes(disability) && disability !== 'Other';
+const usesOtherDisability = (disability: string) => disability.trim() !== '' && !isPresetDisability(disability);
 
-        setToken(t);
-    }, [router]);
+const BARANGAYS = [
+    'BONGA MAYOR',
+    'BONGA MENOR',
+    'BUISAN',
+    'CAMACHILIHAN',
+    'CAMBAOG',
+    'CATACTE',
+    'LICIADA',
+    'MALAMIG',
+    'MALAWAK',
+    'POBLACION',
+    'SAN PEDRO',
+    'TALAMPAS',
+    'TANAWAN',
+    'TIBAGAN',
+];
 
-    useEffect(() => {
-        if (!token) return;
+function formatDateDisplay(value?: string | null) {
+    if (!value) return '-';
+    const parsedDate = new Date(value);
+    if (Number.isNaN(parsedDate.getTime())) return '-';
+    return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(parsedDate).replace(',', '');
+}
 
-        const id = params?.id;
+function computeAge(bday?: string) {
+    if (!bday) return '-';
+    const dob = new Date(bday);
+    if (Number.isNaN(dob.getTime())) return '-';
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const monthDelta = today.getMonth() - dob.getMonth();
+    if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < dob.getDate())) age -= 1;
+    return String(age);
+}
 
-        if (!id) return;
+function memberToForm(member: Member): MemberFormState {
+    return {
+        fname: member.fname,
+        lname: member.lname,
+        mname: member.mname ?? '',
+        bday: member.bday?.slice(0, 10) ?? '',
+        disability: member.disability,
+        phoneNumber: member.phoneNumber,
+        address: member.address,
+        barangay: member.barangay ?? '',
+        isBedridden: member.isBedridden,
+        pwdId: member.pwdId,
+        dateIssued: member.dateIssued?.slice(0, 10) ?? '',
+        gender: member.gender,
+    };
+}
 
-        fetch(`${apiBaseUrl}/members/${id}`, {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        })
-            .then((r) => (r.ok ? r.json() : null))
-            .then(setMember)
-            .catch(() => setMember(null));
-    }, [token, params]);
-
-    function computeAge(bday?: string) {
-        if (!bday) return "-";
-
-        const dob = new Date(bday);
-        const today = new Date();
-
-        let age = today.getFullYear() - dob.getFullYear();
-
-        const m = today.getMonth() - dob.getMonth();
-
-        if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
-            age--;
-        }
-
-        return age;
-    }
-
-    function formatDateDisplay(value?: string | null) {
-        if (!value) return "-";
-
-        const parsedDate = new Date(value);
-
-        if (Number.isNaN(parsedDate.getTime())) {
-            return "-";
-        }
-
-        return new Intl.DateTimeFormat("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-        }).format(parsedDate).replace(",", "");
-    }
-
-    const initials = useMemo(() => {
-        if (!member) return "";
-
-        return `${member.fname?.[0] ?? ""}${member.lname?.[0] ?? ""}`.toUpperCase();
-    }, [member]);
-
-    if (!token) return null;
-
+function DetailItem({ label, value }: { label: string; value?: string | null }) {
     return (
-        <main className="h-screen overflow-hidden bg-slate-100 dark:bg-slate-950">
-            <div className="lg:flex h-full overflow-hidden">
-                <Sidebar
-                    onLogout={() => {
-                        localStorage.removeItem("auth_token");
-                        router.push("/");
-                    }}
-                />
-
-                <section className="flex-1 overflow-y-auto lg:ml-80">
-                    <div className="min-h-full p-6 lg:p-10">
-
-                        {/* Back Button */}
-
-                        <button
-                            onClick={() => router.push("/members")}
-                            className="mb-6 inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-2 text-sm font-medium shadow-sm transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
-                        >
-                            <ArrowLeft size={18} />
-                            Back to Members
-                        </button>
-
-                        {/* Profile Header */}
-
-                        <div className="overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 shadow-2xl">
-
-                            <div className="flex flex-col items-center gap-6 p-8 md:flex-row">
-
-                                <div className="flex h-28 w-28 items-center justify-center rounded-full border-4 border-white bg-white text-4xl font-bold text-indigo-600 shadow-lg">
-                                    {initials}
-                                </div>
-
-                                <div className="flex-1 text-center md:text-left">
-
-                                    <h1 className="text-4xl font-bold text-white">
-                                        {[member?.fname, member?.mname, member?.lname]
-                                            .filter(Boolean)
-                                            .join(" ")}
-                                    </h1>
-
-                                    <div className="mt-3 flex flex-wrap justify-center gap-3 md:justify-start">
-
-                                        <span className="rounded-full bg-white/20 px-4 py-2 text-sm font-medium text-white backdrop-blur">
-                                            <BadgeCheck className="mr-2 inline h-4 w-4" />
-                                            PWD ID: {member?.pwdId}
-                                        </span>
-
-                                        <span className="rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white">
-                                            {member?.disability}
-                                        </span>
-
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Information */}
-
-                        {member ? (
-                            <div className="mt-8 grid gap-6 lg:grid-cols-2">
-                                <InfoCard
-                                    icon={<User size={22} />}
-                                    title="First Name"
-                                    value={member.fname || "-"}
-                                />
-
-                                <InfoCard
-                                    icon={<User size={22} />}
-                                    title="Middle Name"
-                                    value={member.mname || "-"}
-                                />
-
-                                <InfoCard
-                                    icon={<User size={22} />}
-                                    title="Last Name"
-                                    value={member.lname || "-"}
-                                />
-                                <InfoCard
-                                    icon={<Cake size={22} />}
-                                    title="Age"
-                                    value={`${computeAge(member.bday)} years old`}
-                                />
-
-                                <InfoCard
-                                    icon={<Calendar size={22} />}
-                                    title="Birthday"
-                                    value={
-                                        member.bday
-                                            ? formatDateDisplay(member.bday)
-                                            : "-"
-                                    }
-                                />
-                                <InfoCard
-                                    icon={<BadgeCheck size={22} />}
-                                    title="PWD ID"
-                                    value={member.pwdId || "-"}
-                                />
-
-                                <InfoCard
-                                    icon={<Calendar size={22} />}
-                                    title="Date Issued"
-                                    value={formatDateDisplay(member.dateIssued)}
-                                />
-                                <InfoCard
-                                    icon={
-                                        member.gender === "Female" ? (
-                                            <Venus size={22} />
-                                        ) : (
-                                            <Mars size={22} />
-                                        )
-                                    }
-                                    title="Gender"
-                                    value={member.gender}
-                                />
-                                <InfoCard
-                                    icon={<Accessibility size={22} />}
-                                    title="Disability"
-                                    value={member.disability}
-                                />
-
-                                <InfoCard
-                                    icon={<Bed size={22} />}
-                                    title="Bedridden"
-                                    value={member.isBedridden ? "Yes" : "No"}
-                                />
-
-                                <InfoCard
-                                    icon={<MapPin size={22} />}
-                                    title="Barangay"
-                                    value={member.barangay ?? "-"}
-                                />
-                                <InfoCard
-                                    icon={<Phone size={22} />}
-                                    title="Phone Number"
-                                    value={member.phoneNumber || "-"}
-                                />
-                                <div className="lg:col-span-2">
-                                    <InfoCard
-                                        icon={<Home size={22} />}
-                                        title="Complete Address"
-                                        value={member.address || "-"}
-                                    />
-                                </div>
-
-                                <InfoCard
-                                    icon={<Clock size={22} />}
-                                    title="Joined At"
-                                    value={formatDateDisplay(member.joinedAt)}
-                                />
-
-                                <div className="lg:col-span-2">
-                                    <InfoCard
-                                        icon={<Hash size={22} />}
-                                        title="Added By User ID"
-                                        value={member.addedById || "-"}
-                                    />
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="mt-8 rounded-3xl bg-white p-12 text-center shadow-xl dark:bg-slate-900">
-                                <UserCircle2
-                                    className="mx-auto mb-4 animate-pulse text-slate-400"
-                                    size={70}
-                                />
-
-                                <p className="text-lg font-medium text-slate-500">
-                                    Loading member information...
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                </section>
-            </div>
-        </main>
+        <div className="min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</dt>
+            <dd className="mt-1 break-words text-sm font-semibold text-slate-900 dark:text-white">{value || '-'}</dd>
+        </div>
     );
 }
 
-type CardProps = {
-    icon: React.ReactNode;
-    title: string;
-    value: string;
-};
-
-function InfoCard({ icon, title, value }: CardProps) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
     return (
-        <div className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900">
+        <Card className="p-5">
+            <h2 className="text-base font-semibold text-slate-950 dark:text-white">{title}</h2>
+            <dl className="mt-4 grid gap-3 sm:grid-cols-2">{children}</dl>
+        </Card>
+    );
+}
 
-            <div className="flex items-start gap-4">
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+    return (
+        <label className="space-y-2">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                {label} {required ? <span className="text-rose-600 dark:text-rose-400">*</span> : null}
+            </span>
+            {children}
+        </label>
+    );
+}
 
-                <div className="rounded-xl bg-indigo-100 p-3 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
-                    {icon}
+function MemberDetailContent({ token }: { token: string }) {
+    const params = useParams();
+    const router = useRouter();
+    const [member, setMember] = useState<Member | null>(null);
+    const [user, setUser] = useState<MeResponse | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isEditing, setIsEditing] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [form, setForm] = useState<MemberFormState | null>(null);
+    const [otherDisability, setOtherDisability] = useState('');
+    const [isOtherDisabilitySelected, setIsOtherDisabilitySelected] = useState(false);
+    const [status, setStatus] = useState<{ tone: 'info' | 'success' | 'danger'; message: string } | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const id = params?.id;
+        if (!id) return;
+        const load = async () => {
+            setIsLoading(true);
+            setError(null);
+            try {
+                const [memberResponse, meResponse] = await Promise.all([
+                    fetch(`${apiBaseUrl}/members/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
+                    fetch(`${apiBaseUrl}/auth/me`, { headers: { Authorization: `Bearer ${token}` } }),
+                ]);
+                if (!memberResponse.ok) {
+                    setError(await parseApiError(memberResponse));
+                    setMember(null);
+                } else {
+                    setMember(await memberResponse.json());
+                }
+                if (meResponse.ok) setUser(await meResponse.json());
+            } catch {
+                setError('Unable to load member details. Check your connection and try again.');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        load();
+    }, [params, token]);
+
+    const initials = useMemo(() => member ? `${member.fname?.[0] ?? ''}${member.lname?.[0] ?? ''}`.toUpperCase() : '', [member]);
+    const fullName = member ? [member.fname, member.mname, member.lname].filter(Boolean).join(' ') : '';
+    const canUpdate = hasPermission(user?.permissions, 'members.update');
+
+    const startEditing = () => {
+        if (!member) return;
+        setForm(memberToForm(member));
+        setOtherDisability(usesOtherDisability(member.disability) ? member.disability : '');
+        setIsOtherDisabilitySelected(usesOtherDisability(member.disability));
+        setStatus(null);
+        setIsEditing(true);
+    };
+
+    const cancelEditing = () => {
+        setIsEditing(false);
+        setForm(null);
+        setOtherDisability('');
+        setIsOtherDisabilitySelected(false);
+        setStatus(null);
+    };
+
+    const submitEdit = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (!member || !form) return;
+
+        setIsSaving(true);
+        setStatus({ tone: 'info', message: 'Updating member...' });
+
+        try {
+            const response = await fetch(`${apiBaseUrl}/members/${member.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(form),
+            });
+
+            if (!response.ok) {
+                setStatus({ tone: 'danger', message: `Failed to update member: ${await parseApiError(response)}` });
+                return;
+            }
+
+            const updatedMember = await response.json();
+            setMember(updatedMember);
+            setForm(memberToForm(updatedMember));
+            setStatus({ tone: 'success', message: 'Member updated successfully.' });
+            setIsEditing(false);
+        } catch {
+            setStatus({ tone: 'danger', message: 'Unable to update member. Check your connection and try again.' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    if (isLoading) {
+        return <div className="space-y-4"><Skeleton className="h-32 w-full" /><div className="grid gap-4 lg:grid-cols-2"><Skeleton className="h-56" /><Skeleton className="h-56" /></div></div>;
+    }
+
+    if (!member) {
+        return <EmptyState title="Member record not found" description={error || 'The member may have been deleted or you may not have permission to view it.'} action={<Button type="button" variant="secondary" onClick={() => router.push('/members')}>Back to Members</Button>} />;
+    }
+
+    return (
+        <div className="space-y-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <Button type="button" variant="secondary" onClick={() => router.push('/members')}><ArrowLeft className="h-4 w-4" />Back to Members</Button>
+                {canUpdate ? (
+                    isEditing
+                        ? <Button type="button" variant="secondary" onClick={cancelEditing}><X className="h-4 w-4" />Cancel Edit</Button>
+                        : <Button type="button" onClick={startEditing}><Edit className="h-4 w-4" />Edit Member</Button>
+                ) : null}
+            </div>
+
+            {status ? <StatusMessage tone={status.tone}>{status.message}</StatusMessage> : null}
+
+            <Card className="p-5 sm:p-6">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-2xl font-semibold text-white dark:bg-white dark:text-slate-950">{initials}</div>
+                    <div className="min-w-0 flex-1">
+                        <h1 className="break-words text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">{fullName}</h1>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            <Badge tone="info"><BadgeCheck className="mr-1 h-3.5 w-3.5" />PWD ID {member.pwdId}</Badge>
+                            <Badge tone="neutral">{member.disability}</Badge>
+                            <Badge tone={member.isBedridden ? 'warning' : 'success'}>{member.isBedridden ? 'Bedridden' : 'Active'}</Badge>
+                        </div>
+                    </div>
                 </div>
+            </Card>
 
-                <div className="flex-1">
+            {isEditing && form ? (
+                <Card className="p-5 sm:p-6">
+                    <form onSubmit={submitEdit} className="space-y-6">
+                        <div>
+                            <h2 className="text-base font-semibold text-slate-950 dark:text-white">Edit Member Information</h2>
+                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Update the details below. The page URL will remain on this member record.</p>
+                        </div>
 
-                    <p className="text-sm font-medium uppercase tracking-wide text-slate-500">
-                        {title}
-                    </p>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <Field label="First name" required>
+                                <TextInput value={form.fname} onChange={(event) => setForm({ ...form, fname: event.target.value })} required />
+                            </Field>
+                            <Field label="Middle name">
+                                <TextInput value={form.mname} onChange={(event) => setForm({ ...form, mname: event.target.value })} />
+                            </Field>
+                            <Field label="Last name" required>
+                                <TextInput value={form.lname} onChange={(event) => setForm({ ...form, lname: event.target.value })} required />
+                            </Field>
+                            <Field label="Gender" required>
+                                <SelectInput value={form.gender} onChange={(event) => setForm({ ...form, gender: event.target.value })} required>
+                                    <option value="">Select gender</option>
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                    <option value="Other">Other</option>
+                                </SelectInput>
+                            </Field>
+                            <Field label="Birthday" required>
+                                <TextInput type="date" value={form.bday} onChange={(event) => setForm({ ...form, bday: event.target.value })} required />
+                            </Field>
+                            <Field label="Phone number" required>
+                                <TextInput value={form.phoneNumber} onChange={(event) => setForm({ ...form, phoneNumber: event.target.value })} placeholder="09xxxxxxxxx" required />
+                            </Field>
+                            <Field label="Barangay" required>
+                                <SelectInput value={form.barangay} onChange={(event) => setForm({ ...form, barangay: event.target.value })} required>
+                                    <option value="">Select barangay</option>
+                                    {BARANGAYS.map((barangay) => <option key={barangay} value={barangay}>{barangay}</option>)}
+                                </SelectInput>
+                            </Field>
+                            <Field label="Address" required>
+                                <TextInput value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} required />
+                            </Field>
+                            <Field label="Disability" required>
+                                <SelectInput
+                                    value={isPresetDisability(form.disability) ? form.disability : (isOtherDisabilitySelected ? 'Other' : '')}
+                                    onChange={(event) => {
+                                        if (event.target.value === 'Other') {
+                                            setIsOtherDisabilitySelected(true);
+                                            setForm({ ...form, disability: otherDisability });
+                                            return;
+                                        }
+                                        setIsOtherDisabilitySelected(false);
+                                        setOtherDisability('');
+                                        setForm({ ...form, disability: event.target.value });
+                                    }}
+                                    required
+                                >
+                                    <option value="">Select disability</option>
+                                    {DISABILITIES.map((disability) => <option key={disability} value={disability}>{disability}</option>)}
+                                </SelectInput>
+                                {isOtherDisabilitySelected ? (
+                                    <TextInput
+                                        value={otherDisability}
+                                        onChange={(event) => {
+                                            setOtherDisability(event.target.value);
+                                            setForm({ ...form, disability: event.target.value });
+                                        }}
+                                        placeholder="Specify disability"
+                                        required
+                                    />
+                                ) : null}
+                            </Field>
+                            <Field label="Bedridden" required>
+                                <SelectInput value={form.isBedridden ? 'yes' : 'no'} onChange={(event) => setForm({ ...form, isBedridden: event.target.value === 'yes' })} required>
+                                    <option value="no">No</option>
+                                    <option value="yes">Yes</option>
+                                </SelectInput>
+                            </Field>
+                            <Field label="PWD ID" required>
+                                <TextInput value={form.pwdId} onChange={(event) => setForm({ ...form, pwdId: event.target.value })} required />
+                            </Field>
+                            <Field label="Date issued">
+                                <TextInput type="date" value={form.dateIssued} onChange={(event) => setForm({ ...form, dateIssued: event.target.value })} />
+                            </Field>
+                        </div>
 
-                    <p className="mt-2 break-words text-lg font-semibold text-slate-800 dark:text-white">
-                        {value}
-                    </p>
+                        <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 dark:border-slate-800 sm:flex-row sm:justify-end">
+                            <Button type="button" variant="secondary" onClick={cancelEditing} disabled={isSaving}>Cancel</Button>
+                            <LoadingButton type="submit" isLoading={isSaving} loadingText="Updating...">Update Member</LoadingButton>
+                        </div>
+                    </form>
+                </Card>
+            ) : null}
 
-                </div>
-
+            <div className="grid gap-6 lg:grid-cols-2">
+                <Section title="Personal Information">
+                    <DetailItem label="First name" value={member.fname} />
+                    <DetailItem label="Middle name" value={member.mname} />
+                    <DetailItem label="Last name" value={member.lname} />
+                    <DetailItem label="Gender" value={member.gender} />
+                    <DetailItem label="Birthday" value={formatDateDisplay(member.bday)} />
+                    <DetailItem label="Age" value={`${computeAge(member.bday)} years old`} />
+                </Section>
+                <Section title="Contact Information">
+                    <DetailItem label="Phone number" value={member.phoneNumber} />
+                    <DetailItem label="Barangay" value={member.barangay} />
+                    <div className="sm:col-span-2"><DetailItem label="Complete address" value={member.address} /></div>
+                </Section>
+                <Section title="PWD Information">
+                    <DetailItem label="PWD ID" value={member.pwdId} />
+                    <DetailItem label="Disability" value={member.disability} />
+                    <DetailItem label="Date issued" value={formatDateDisplay(member.dateIssued)} />
+                    <DetailItem label="Bedridden" value={member.isBedridden ? 'Yes' : 'No'} />
+                </Section>
+                <Section title="Other Information">
+                    <DetailItem label="Joined" value={formatDateDisplay(member.joinedAt)} />
+                    <DetailItem label="Record status" value={member.isBedridden ? 'Needs bedridden support' : 'Active member'} />
+                </Section>
             </div>
         </div>
     );
+}
+
+export default function MemberDetailPage() {
+    return <AppShell title="Member Details" description="View personal, contact, and PWD registry information.">{(token) => <MemberDetailContent token={token} />}</AppShell>;
 }
