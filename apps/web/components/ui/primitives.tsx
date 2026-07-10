@@ -33,7 +33,7 @@ export function LoadingButton({
     children,
     disabled,
     ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { isLoading?: boolean; loadingText?: string }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { isLoading?: boolean; loadingText?: string; variant?: ButtonVariant }) {
     return (
         <Button disabled={disabled || isLoading} aria-busy={isLoading || undefined} {...props}>
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}

@@ -1,6 +1,7 @@
 export interface PermissionCatalogItem {
   key: string;
   displayName: string;
+  description: string;
 }
 
 export const hasPermission = (
